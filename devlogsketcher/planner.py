@@ -178,9 +178,11 @@ def plan(
     raise NotImplementedError(f"unknown planner backend '{backend}'")
 
 
-def apply_proposals(store: Store, proposals: list[Proposal], run_id: int) -> list[int]:
-    """Persist proposals; returns the affected entry ids."""
-    touched: list[int] = []
+def apply_proposals(
+    store: Store, proposals: list[Proposal], run_id: int
+) -> list[tuple[int, str]]:
+    """Persist proposals; returns (entry_id, "created"|"updated") per proposal."""
+    results: list[tuple[int, str]] = []
     for p in proposals:
         # Only honor an update if the target entry actually exists; otherwise the
         # planner referenced a stale/hallucinated id — fall back to creating one.
@@ -189,11 +191,11 @@ def apply_proposals(store: Store, proposals: list[Proposal], run_id: int) -> lis
                 p.entry_id, title=p.title, summary=p.summary,
                 source_refs=p.source_refs, run_id=run_id,
             )
-            touched.append(p.entry_id)
+            results.append((p.entry_id, "updated"))
         else:
             eid = store.add_entry(
                 audience=p.audience, title=p.title, summary=p.summary,
                 source_refs=p.source_refs, run_id=run_id,
             )
-            touched.append(eid)
-    return touched
+            results.append((eid, "created"))
+    return results

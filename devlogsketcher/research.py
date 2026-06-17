@@ -11,12 +11,27 @@ tools in `repo_tools.py`. A `stub` backend remains for offline testing.
 
 from __future__ import annotations
 
+from typing import Callable
+
 from .db import Entry, Store
 from .llm import MODEL, first_text, get_client
 from .paths import Project
 from .repo_tools import TOOL_SCHEMAS, RepoTools
 
 MAX_TURNS = 24  # safety cap on the agentic loop
+
+# A progress sink: called with short status lines as research proceeds. No-op default.
+Progress = Callable[[str], None]
+
+
+def _noop(_: str) -> None:
+    pass
+
+
+def _describe_tool(name: str, args: dict) -> str:
+    """One-line summary of a tool call for progress output."""
+    target = args.get("path") or args.get("pattern") or ""
+    return f"{name}({target})" if target else name
 
 _RESEARCH_SYSTEM = (
     "You research one devlog/social post idea against a codebase and produce a "
@@ -41,12 +56,13 @@ Outline only — do not write the post.
 """
 
 
-def _run_agent(entry: Entry, repo_path: str) -> str:
+def _run_agent(entry: Entry, repo_path: str, progress: Progress = _noop) -> str:
     client = get_client()
     tools = RepoTools(repo_path)
     messages = [{"role": "user", "content": build_research_prompt(entry, repo_path)}]
 
-    for _ in range(MAX_TURNS):
+    for turn in range(1, MAX_TURNS + 1):
+        progress(f"Thinking (turn {turn}/{MAX_TURNS})…")
         message = client.messages.create(
             model=MODEL,
             max_tokens=16000,
@@ -57,12 +73,14 @@ def _run_agent(entry: Entry, repo_path: str) -> str:
             messages=messages,
         )
         if message.stop_reason != "tool_use":
+            progress("Writing the outline…")
             return first_text(message)
 
         messages.append({"role": "assistant", "content": message.content})
         results = []
         for block in message.content:
             if block.type == "tool_use":
+                progress(f"  exploring repo: {_describe_tool(block.name, block.input)}")
                 results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
@@ -78,13 +96,14 @@ def research_entry(
     project: Project,
     entry_id: int,
     backend: str = "claude",
+    progress: Progress = _noop,
 ) -> Entry:
     entry = store.get_entry(entry_id)
     if entry is None:
         raise ValueError(f"no entry #{entry_id}")
 
     if backend == "claude":
-        outline = _run_agent(entry, project.repo_path)
+        outline = _run_agent(entry, project.repo_path, progress)
     elif backend == "stub":
         outline = (
             "[STUB OUTLINE] research backend not run.\n\n"

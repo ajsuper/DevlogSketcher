@@ -23,7 +23,12 @@ from .paths import (
 )
 from .planner import apply_proposals, plan
 from .research import research_entry
-from .templates import load_templates, seed_templates
+from .templates import load_templates, reseed_templates, seed_templates
+
+
+def info(msg: str) -> None:
+    """Progress/status line — goes to stderr so stdout stays the actual results."""
+    print(msg, file=sys.stderr, flush=True)
 
 
 # --- commands -------------------------------------------------------------
@@ -85,32 +90,57 @@ def cmd_projects(args) -> int:
 def cmd_run(args) -> int:
     project = resolve_current_project(args.repo)
     templates = load_templates(project.templates_dir)
-    digest = build_digest(project.repo_path, args.window)
 
     if args.show_prompt:
         from .planner import build_planner_prompt
+        digest = build_digest(project.repo_path, args.window)
         store = Store(project.db_path)
         print(build_planner_prompt(digest, store.list_entries(), templates))
         store.close()
         return 0
 
+    info(f"Project: {project.name}  ({project.repo_path})")
+    info(f"Audiences: {', '.join(t.audience for t in templates) or 'none'}")
+    info(f"Scanning git history (last {args.window} days)…")
+    digest = build_digest(project.repo_path, args.window)
+    info(f"  {digest.num_commits} commit(s) in window.")
+
+    if digest.num_commits == 0:
+        info("Nothing to plan — no commits in this window. Try a wider --window.")
+        return 0
+
     store = Store(project.db_path)
+    existing = store.list_entries()
     run_id = store.create_run(
         window_days=digest.window_days, since=digest.since,
         num_commits=digest.num_commits,
     )
+
+    info(f"Reviewing against {len(existing)} existing idea(s).")
+    if args.backend == "heuristic":
+        info("Planning with heuristic stub (offline)…")
+    else:
+        info("Planning with Claude (Opus 4.8), deduping by meaning — "
+             "this can take a minute…")
     proposals = plan(digest, store, templates, backend=args.backend)
-    touched = apply_proposals(store, proposals, run_id)
+    results = apply_proposals(store, proposals, run_id)
     store.close()
 
-    print(f"Run #{run_id}: {digest.num_commits} commits over {digest.window_days}d "
-          f"-> {len(touched)} entr{'y' if len(touched) == 1 else 'ies'} touched.")
+    created = sum(1 for _, a in results if a == "created")
+    updated = sum(1 for _, a in results if a == "updated")
+    info(f"  Planner returned {len(proposals)} proposal(s): "
+         f"{created} new, {updated} updated.")
+
+    if not results:
+        print("No new post ideas this run.")
+        return 0
+    print(f"Run #{run_id}: {created} new, {updated} updated.")
     if args.backend == "heuristic":
-        print("(heuristic stub backend — wire up the Claude planner for real ideas)")
-    for eid in touched:
-        e = store_entry_line(project, eid)
-        if e:
-            print(f"  {e}")
+        print("(heuristic stub backend — use the default 'claude' backend for real ideas)")
+    for eid, action in results:
+        line = store_entry_line(project, eid)
+        if line:
+            print(f"  [{action}] {line}")
     return 0
 
 
@@ -156,10 +186,19 @@ def cmd_show(args) -> int:
 def cmd_research(args) -> int:
     project = resolve_current_project(args.repo)
     store = Store(project.db_path)
+    target = store.get_entry(args.id)
+    if target is None:
+        store.close()
+        raise DevlogError(f"no entry #{args.id}")
+    if args.backend != "stub":
+        info(f"Researching #{target.id}: {target.title}")
+        info(f"Agent (Opus 4.8) is reading {project.name} to flesh out the outline…")
     try:
-        e = research_entry(store, project, args.id, backend=args.backend)
+        e = research_entry(store, project, args.id,
+                           backend=args.backend, progress=info)
     finally:
         store.close()
+    info("Done.")
     print(f"Researched #{e.id} -> status '{e.status}'.")
     print("View it with `devlog show %d`." % e.id)
     return 0
@@ -184,6 +223,11 @@ def cmd_status(args) -> int:
 
 def cmd_templates(args) -> int:
     project = resolve_current_project(args.repo)
+    if args.reseed:
+        for name, action in reseed_templates(project.templates_dir):
+            print(f"  {name:<12} {action}")
+        print(f"Reseeded built-in templates in {project.templates_dir}")
+        return 0
     templates = load_templates(project.templates_dir)
     print(f"Templates dir: {project.templates_dir}")
     if not templates:
@@ -249,6 +293,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_status)
 
     s = sub.add_parser("templates", help="list this project's audience templates")
+    s.add_argument("--reseed", action="store_true",
+                   help="refresh built-in templates to current defaults "
+                        "(existing edits backed up to <name>.md.bak)")
     s.set_defaults(func=cmd_templates)
 
     s = sub.add_parser("digest", help="print the repo digest the planner would see")
