@@ -222,7 +222,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("run", help="review history and propose/update post ideas")
     s.add_argument("--window", type=int, default=DEFAULT_WINDOW_DAYS,
                    help=f"trailing look-back in days (default {DEFAULT_WINDOW_DAYS})")
-    s.add_argument("--backend", default="heuristic", help="planner backend")
+    s.add_argument("--backend", default="claude", choices=["claude", "heuristic"],
+                   help="planner backend (default: claude; heuristic = offline stub)")
     s.add_argument("--show-prompt", action="store_true",
                    help="print the planner prompt instead of running")
     s.set_defaults(func=cmd_run)
@@ -238,7 +239,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("research", help="deepen one entry's outline (codebase research)")
     s.add_argument("id", type=int)
-    s.add_argument("--backend", default="stub", help="research backend")
+    s.add_argument("--backend", default="claude", choices=["claude", "stub"],
+                   help="research backend (default: claude; stub = offline)")
     s.set_defaults(func=cmd_research)
 
     s = sub.add_parser("status", help="set an entry's lifecycle status")
