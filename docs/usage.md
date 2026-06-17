@@ -178,6 +178,22 @@ devlog show 4                 # 4. read the outline, write your post
 devlog status 4 published     # 5. mark it done
 ```
 
+## Web app
+
+Prefer a UI? Everything above is also available in a local web app with full parity:
+
+```bash
+devlog web                 # starts on http://127.0.0.1:8765 and opens your browser
+devlog web --port 9000 --no-browser
+```
+
+It serves a single-page UI that can: link/relink repos, switch between projects, run
+the planner and watch live progress, browse and filter ideas, open an idea to read its
+summary/outline, change its status, run research (with the same live progress stream),
+view and reseed templates, and inspect the digest or planner prompt. The server is
+stdlib-only (no extra dependencies); `run` and `research` still need the `[ai]` extra
+and your `ANTHROPIC_API_KEY`, exactly like the CLI. It binds to localhost only.
+
 ## Command reference
 
 | Command | What it does |
@@ -191,5 +207,6 @@ devlog status 4 published     # 5. mark it done
 | `devlog status <id> <status>` | Set an entry's lifecycle status |
 | `devlog templates [--reseed]` | List audience templates (edit the markdown directly); `--reseed` refreshes built-ins to current defaults |
 | `devlog digest [--window N]` | Print the raw digest the planner would see (debug) |
+| `devlog web [--host H] [--port P] [--no-browser]` | Launch the local web app (full CLI parity) |
 
 A global `--repo PATH` works on any command if you're not inside the repo's directory.

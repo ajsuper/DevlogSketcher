@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevlogSketcher</title>
+<style>
+  :root {
+    --bg:#11131a; --panel:#1a1d27; --panel2:#222633; --line:#2e3340;
+    --text:#e7e9ee; --muted:#9aa3b2; --accent:#7aa2f7; --accent2:#9ece6a;
+    --warn:#e0af68; --bad:#f7768e; --radius:10px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+         background:var(--bg); color:var(--text); }
+  a { color:var(--accent); }
+  header { display:flex; gap:12px; align-items:center; padding:12px 18px;
+           background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
+  header h1 span { color:var(--accent); }
+  .grow { flex:1; }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px;
+         align-items:start; }
+  @media (max-width: 900px){ main { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+          padding:14px 16px; margin-bottom:16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.6px;
+             color:var(--muted); margin:0 0 10px; }
+  select, input, button, textarea {
+    font:inherit; color:var(--text); background:var(--panel2);
+    border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  input[type=number]{ width:80px; }
+  button { cursor:pointer; background:var(--panel2); }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--accent); color:#0b0e14; border-color:var(--accent); font-weight:600; }
+  button.primary:hover { filter:brightness(1.08); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--muted); }
+  .pill { font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid var(--line);
+          background:var(--panel2); white-space:nowrap; }
+  .status-suggested{ color:var(--accent); } .status-researched{ color:var(--accent2); }
+  .status-in_progress{ color:var(--warn); } .status-published{ color:var(--accent2); }
+  .status-rejected{ color:var(--bad); } .status-stale{ color:var(--muted); }
+  ul.entries { list-style:none; margin:0; padding:0; }
+  ul.entries li { padding:9px 10px; border:1px solid var(--line); border-radius:8px;
+                  margin-bottom:7px; cursor:pointer; background:var(--panel2); }
+  ul.entries li:hover { border-color:var(--accent); }
+  ul.entries li.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .etitle { font-weight:600; }
+  .emeta { font-size:12px; color:var(--muted); margin-top:2px; }
+  pre { white-space:pre-wrap; word-wrap:break-word; background:var(--panel2);
+        border:1px solid var(--line); border-radius:8px; padding:10px; margin:0;
+        max-height:55vh; overflow:auto; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  #console { background:#0c0e14; color:#c5ccd6; font:12px/1.5 ui-monospace,Menlo,monospace;
+             border:1px solid var(--line); border-radius:8px; padding:10px; height:160px;
+             overflow:auto; white-space:pre-wrap; }
+  #console .err { color:var(--bad); } #console .ok { color:var(--accent2); }
+  .field { display:flex; flex-direction:column; gap:3px; }
+  .field label { font-size:11px; color:var(--muted); }
+  .hidden { display:none; }
+  .toast { position:fixed; bottom:16px; right:16px; background:var(--panel2);
+           border:1px solid var(--line); border-left:3px solid var(--accent);
+           padding:10px 14px; border-radius:8px; max-width:360px; }
+  .toast.err { border-left-color:var(--bad); }
+  .detail-field { margin-bottom:10px; }
+  .detail-field .k { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+  code.ref { font-size:11.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Devlog<span>Sketcher</span></h1>
+  <div class="row">
+    <select id="projectSelect" title="Active project"></select>
+    <button id="refreshBtn" title="Reload projects & entries">↻</button>
+    <button id="linkToggle">＋ Link repo</button>
+  </div>
+  <div class="grow"></div>
+  <span id="repoLabel" class="muted"></span>
+</header>
+
+<!-- Link / relink form -->
+<div id="linkForm" class="card hidden" style="margin:16px;">
+  <h2>Link a repository</h2>
+  <div class="row">
+    <div class="field"><label>Repo path (git root)</label>
+      <input id="linkPath" placeholder="/path/to/repo" size="34"></div>
+    <div class="field"><label>Name (optional)</label>
+      <input id="linkName" placeholder="defaults to dir name"></div>
+    <button class="primary" id="linkBtn">Link</button>
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <div class="field"><label>Or re-point an existing project (after a move)</label>
+      <select id="relinkSelect"></select></div>
+    <button id="relinkBtn">Relink to path above</button>
+  </div>
+</div>
+
+<main>
+  <div class="left">
+    <!-- Run -->
+    <div class="card">
+      <h2>Generate ideas — run</h2>
+      <div class="row">
+        <div class="field"><label>Look-back (days)</label>
+          <input type="number" id="runWindow" value="30" min="1"></div>
+        <div class="field"><label>Backend</label>
+          <select id="runBackend">
+            <option value="claude">Claude (real)</option>
+            <option value="heuristic">heuristic (offline stub)</option>
+          </select></div>
+        <button class="primary" id="runBtn">▶ Run</button>
+        <button id="digestBtn">View digest</button>
+        <button id="promptBtn">View planner prompt</button>
+      </div>
+    </div>
+
+    <!-- Entries -->
+    <div class="card">
+      <h2>Post ideas</h2>
+      <div class="row" style="margin-bottom:10px;">
+        <div class="field"><label>Status</label>
+          <select id="filterStatus"><option value="">all</option></select></div>
+        <div class="field"><label>Audience</label>
+          <input id="filterAudience" placeholder="all" size="10"></div>
+        <button id="applyFilter">Filter</button>
+      </div>
+      <ul class="entries" id="entryList"></ul>
+      <div id="entryEmpty" class="muted hidden">No matching entries.</div>
+    </div>
+
+    <!-- Templates -->
+    <div class="card">
+      <h2>Audience templates</h2>
+      <div id="templateList" class="muted">—</div>
+      <div class="row" style="margin-top:10px;">
+        <button id="reseedBtn">Reseed built-ins</button>
+        <span class="muted">edits backed up to &lt;name&gt;.md.bak</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <!-- Console -->
+    <div class="card">
+      <h2>Activity</h2>
+      <div id="console"></div>
+    </div>
+
+    <!-- Detail / viewer -->
+    <div class="card" id="viewerCard">
+      <h2 id="viewerTitle">Detail</h2>
+      <div id="viewer" class="muted">Select an idea to view it, or run / view a digest.</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let STATE = { projects:[], projectId:null, statuses:[], entries:[], selected:null };
+
+function toast(msg, isErr){ const t=$("#toast"); t.textContent=msg;
+  t.className="toast"+(isErr?" err":""); t.classList.remove("hidden");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.add("hidden"),3500); }
+
+function logLine(msg, cls){ const c=$("#console"); const d=document.createElement("div");
+  if(cls) d.className=cls; d.textContent=msg; c.appendChild(d); c.scrollTop=c.scrollHeight; }
+function logClear(){ $("#console").innerHTML=""; }
+
+async function api(path, opts){
+  const r = await fetch(path, opts);
+  const ct = r.headers.get("content-type")||"";
+  const data = ct.includes("json") ? await r.json() : await r.text();
+  if(!r.ok){ const msg = (data && data.error) || r.statusText; throw new Error(msg); }
+  return data;
+}
+
+// stream NDJSON from a POST, calling onEvent per line
+async function stream(path, body, onEvent){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})});
+  if(!r.ok && !r.body){ throw new Error("request failed"); }
+  const reader = r.body.getReader(); const dec = new TextDecoder(); let buf="";
+  while(true){
+    const {done,value} = await reader.read(); if(done) break;
+    buf += dec.decode(value,{stream:true}); let i;
+    while((i=buf.indexOf("\n"))>=0){ const line=buf.slice(0,i); buf=buf.slice(i+1);
+      if(line.trim()) onEvent(JSON.parse(line)); }
+  }
+}
+
+async function loadProjects(){
+  STATE.projects = await api("/api/projects");
+  const sel=$("#projectSelect"); sel.innerHTML="";
+  const rel=$("#relinkSelect"); rel.innerHTML="";
+  if(STATE.projects.length===0){
+    sel.innerHTML='<option value="">— no projects: link a repo —</option>';
+    STATE.projectId=null; $("#repoLabel").textContent="";
+    renderEntries([]); renderTemplates([]); return;
+  }
+  for(const p of STATE.projects){
+    sel.add(new Option(p.name, p.id));
+    rel.add(new Option(`${p.name} (${p.id})`, p.id));
+  }
+  if(!STATE.projects.find(p=>p.id===STATE.projectId)) STATE.projectId=STATE.projects[0].id;
+  sel.value=STATE.projectId;
+  onProjectChange();
+}
+
+function currentProject(){ return STATE.projects.find(p=>p.id===STATE.projectId); }
+
+async function onProjectChange(){
+  const p=currentProject(); if(!p) return;
+  $("#repoLabel").textContent = p.repo_path;
+  await Promise.all([loadEntries(), loadTemplates()]);
+}
+
+async function loadEntries(){
+  const p=currentProject(); if(!p) return;
+  const params=new URLSearchParams();
+  const st=$("#filterStatus").value; const au=$("#filterAudience").value.trim();
+  if(st) params.set("status",st); if(au) params.set("audience",au);
+  STATE.entries = await api(`/api/projects/${p.id}/entries?`+params);
+  renderEntries(STATE.entries);
+}
+
+function renderEntries(entries){
+  const ul=$("#entryList"); ul.innerHTML="";
+  $("#entryEmpty").classList.toggle("hidden", entries.length>0);
+  for(const e of entries){
+    const li=document.createElement("li");
+    li.dataset.id=e.id;
+    if(STATE.selected && STATE.selected.id===e.id) li.classList.add("active");
+    li.innerHTML = `<div class="etitle">#${e.id} ${escapeHtml(e.title)}</div>
+      <div class="emeta"><span class="pill">${e.audience}</span>
+      <span class="pill status-${e.status}">${e.status}</span></div>`;
+    li.onclick=()=>showEntry(e.id);
+    ul.appendChild(li);
+  }
+}
+
+async function showEntry(id){
+  const p=currentProject();
+  const e = await api(`/api/projects/${p.id}/entries/${id}`);
+  STATE.selected=e; renderEntries(STATE.entries);
+  $("#viewerTitle").textContent = `#${e.id} — ${e.title}`;
+  const opts = STATE.statuses.map(s=>`<option ${s===e.status?"selected":""}>${s}</option>`).join("");
+  const refs = (e.source_refs||[]).map(r=>`<code class="ref pill">${escapeHtml(r)}</code>`).join(" ") || '<span class="muted">none</span>';
+  $("#viewer").innerHTML = `
+    <div class="detail-field"><div class="k">Audience</div>${e.audience}</div>
+    <div class="detail-field"><div class="k">Status</div>
+      <div class="row"><select id="statusSel">${opts}</select>
+      <button id="statusBtn">Set status</button>
+      <div class="grow"></div>
+      <select id="resBackend"><option value="claude">Claude (real)</option><option value="stub">stub (offline)</option></select>
+      <button class="primary" id="researchBtn">🔬 Research</button></div></div>
+    <div class="detail-field"><div class="k">Summary</div>${escapeHtml(e.summary)||'<span class="muted">—</span>'}</div>
+    <div class="detail-field"><div class="k">Source refs</div>${refs}</div>
+    <div class="detail-field"><div class="k">Outline</div>
+      <pre>${escapeHtml(e.outline)|| '(not researched yet — click Research)'}</pre></div>`;
+  $("#statusBtn").onclick=()=>setStatus(e.id, $("#statusSel").value);
+  $("#researchBtn").onclick=()=>doResearch(e.id, $("#resBackend").value);
+}
+
+async function setStatus(id, status){
+  const p=currentProject();
+  try{
+    await api(`/api/projects/${p.id}/entries/${id}/status`, {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({status})});
+    toast(`#${id} → ${status}`); await loadEntries(); await showEntry(id);
+  }catch(e){ toast(e.message,true); }
+}
+
+async function doRun(){
+  const p=currentProject(); if(!p){ toast("Link a repo first",true); return; }
+  logClear(); logLine("$ devlog run"); setBusy(true);
+  try{
+    await stream(`/api/projects/${p.id}/run`, {
+      window: parseInt($("#runWindow").value)||30, backend:$("#runBackend").value
+    }, ev=>{
+      if(ev.type==="progress") logLine(ev.message);
+      else if(ev.type==="error") logLine("error: "+ev.message,"err");
+      else if(ev.type==="done"){
+        if(ev.message) logLine(ev.message);
+        logLine(`✓ ${ev.summary.created} new, ${ev.summary.updated} updated.`,"ok");
+        (ev.entries||[]).forEach(e=>logLine(`  [${e.action}] #${e.id} ${e.title}`));
+        loadEntries();
+      }
+    });
+  }catch(e){ logLine("error: "+e.message,"err"); }
+  setBusy(false);
+}
+
+async function doResearch(id, backend){
+  const p=currentProject();
+  logClear(); logLine(`$ devlog research ${id}`); setBusy(true);
+  try{
+    await stream(`/api/projects/${p.id}/research/${id}`, {backend}, ev=>{
+      if(ev.type==="progress") logLine(ev.message);
+      else if(ev.type==="error") logLine("error: "+ev.message,"err");
+      else if(ev.type==="done"){ logLine("✓ done","ok"); STATE.selected=ev.entry;
+        loadEntries(); showEntry(id); }
+    });
+  }catch(e){ logLine("error: "+e.message,"err"); }
+  setBusy(false);
+}
+
+async function loadTemplates(){
+  const p=currentProject(); if(!p) return;
+  const tpls = await api(`/api/projects/${p.id}/templates`);
+  renderTemplates(tpls);
+}
+function renderTemplates(tpls){
+  const el=$("#templateList");
+  if(!tpls.length){ el.innerHTML='<span class="muted">none</span>'; return; }
+  el.innerHTML = tpls.map(t=>{
+    const first=(t.body.split("\n").find(l=>l.trim())||"").replace(/^#\s*/,"");
+    return `<div class="row" style="margin-bottom:4px;"><span class="pill">${t.audience}</span>
+      <span class="muted">${escapeHtml(first)}</span>
+      <button data-aud="${t.audience}" class="tplView">view</button></div>`;
+  }).join("");
+  el.querySelectorAll(".tplView").forEach(b=>b.onclick=()=>{
+    const t=tpls.find(x=>x.audience===b.dataset.aud);
+    $("#viewerTitle").textContent=`Template: ${t.audience}`;
+    $("#viewer").innerHTML=`<pre>${escapeHtml(t.body)}</pre>`;
+  });
+}
+
+async function reseed(){
+  const p=currentProject(); if(!p) return;
+  try{
+    const res = await api(`/api/projects/${p.id}/templates/reseed`, {method:"POST"});
+    logClear(); logLine("$ devlog templates --reseed");
+    res.forEach(r=>logLine(`  ${r.name}: ${r.action}`));
+    toast("Templates reseeded"); loadTemplates();
+  }catch(e){ toast(e.message,true); }
+}
+
+async function viewDigest(){
+  const p=currentProject(); if(!p) return;
+  const w=parseInt($("#runWindow").value)||30;
+  const d = await api(`/api/projects/${p.id}/digest?window=${w}`);
+  $("#viewerTitle").textContent=`Digest (last ${d.window}d, ${d.num_commits} commits)`;
+  $("#viewer").innerHTML=`<pre>${escapeHtml(d.text)}</pre>`;
+}
+async function viewPrompt(){
+  const p=currentProject(); if(!p) return;
+  const w=parseInt($("#runWindow").value)||30;
+  const d = await api(`/api/projects/${p.id}/prompt?window=${w}`);
+  $("#viewerTitle").textContent="Planner prompt";
+  $("#viewer").innerHTML=`<pre>${escapeHtml(d.prompt)}</pre>`;
+}
+
+async function linkRepo(relinkId){
+  const path=$("#linkPath").value.trim();
+  if(!path){ toast("Enter a repo path",true); return; }
+  const body={ repo_path:path };
+  if(relinkId) body.relink=relinkId; else { const n=$("#linkName").value.trim(); if(n) body.name=n; }
+  try{
+    const p = await api("/api/projects", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+    toast(relinkId?`Relinked ${p.name}`:`Linked ${p.name}`);
+    STATE.projectId=p.id; $("#linkForm").classList.add("hidden");
+    $("#linkPath").value=""; $("#linkName").value="";
+    await loadProjects();
+  }catch(e){ toast(e.message,true); }
+}
+
+function setBusy(b){ $("#runBtn").disabled=b; }
+function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,
+  c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// wire up
+$("#projectSelect").onchange = e=>{ STATE.projectId=e.target.value; STATE.selected=null; onProjectChange(); };
+$("#refreshBtn").onclick = loadProjects;
+$("#linkToggle").onclick = ()=>$("#linkForm").classList.toggle("hidden");
+$("#linkBtn").onclick = ()=>linkRepo(null);
+$("#relinkBtn").onclick = ()=>linkRepo($("#relinkSelect").value);
+$("#runBtn").onclick = doRun;
+$("#digestBtn").onclick = viewDigest;
+$("#promptBtn").onclick = viewPrompt;
+$("#applyFilter").onclick = loadEntries;
+$("#reseedBtn").onclick = reseed;
+
+(async function init(){
+  try{
+    const h = await api("/api/health");
+    STATE.statuses = h.statuses;
+    $("#runWindow").value = h.default_window;
+    const fs=$("#filterStatus"); h.statuses.forEach(s=>fs.add(new Option(s,s)));
+    await loadProjects();
+  }catch(e){ toast("Failed to load: "+e.message, true); }
+})();
+</script>
+</body>
+</html>

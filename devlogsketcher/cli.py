@@ -239,6 +239,12 @@ def cmd_templates(args) -> int:
     return 0
 
 
+def cmd_web(args) -> int:
+    from .web import serve
+    serve(host=args.host, port=args.port, open_browser=not args.no_browser)
+    return 0
+
+
 def cmd_digest(args) -> int:
     project = resolve_current_project(args.repo)
     digest = build_digest(project.repo_path, args.window)
@@ -301,6 +307,13 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("digest", help="print the repo digest the planner would see")
     s.add_argument("--window", type=int, default=DEFAULT_WINDOW_DAYS)
     s.set_defaults(func=cmd_digest)
+
+    s = sub.add_parser("web", help="launch the local web app (full CLI parity)")
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=8765)
+    s.add_argument("--no-browser", action="store_true",
+                   help="don't auto-open a browser")
+    s.set_defaults(func=cmd_web)
 
     return p
 
