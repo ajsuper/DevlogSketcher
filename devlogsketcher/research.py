@@ -41,25 +41,36 @@ _RESEARCH_TEMPLATE = """\
 
 **Headline:** Cutting cold-start time in half by caching the parsed config
 
-1. **The hook** — open on the symptom users actually felt: slow startup.
-2. **What was happening** — explain why the config was re-parsed on every launch.
-3. **The fix** — introduce the on-disk cache and how it short-circuits the parse.
-4. **The payoff** — show the before/after numbers and what it means for users.
-5. **Caveat** — note the one case where the cache is intentionally skipped.
+- **The hook** — open on the symptom users actually felt: slow startup.
+- **What was happening** — explain why the config was re-parsed on every launch.
+- **The fix** — introduce the on-disk cache and how it short-circuits the parse.
+- **The payoff** — show the before/after numbers and what it means for users.
+- **Caveat** — note the one case where the cache is intentionally skipped.
 
 ## Details
 
-1. **The hook** — startup measured at ~1.8s on a cold run (see `bench/startup.py`);
-   users had complained in issue #214.
-2. **What was happening** — `Config.load()` in `app/config.py` re-read and re-validated
-   all 12 YAML files every launch; no memoization. Introduced in commit `a1b2c3d`.
-3. **The fix** — new `ConfigCache` (`app/cache.py`, commit `e4f5a6b`) writes a parsed
-   blob to `~/.cache/app/config.bin`, keyed by a hash of the source files' mtimes;
-   `load()` now returns the cached object when the hash matches.
-4. **The payoff** — cold start dropped to ~0.9s (same `bench/startup.py` run); ~50%
-   faster. Warm starts are unchanged.
-5. **Caveat** — the cache is bypassed when `$APP_ENV=dev` so config edits take effect
-   immediately; don't claim it's always on.
+### The hook
+- Startup measured at ~1.8s on a cold run (see `bench/startup.py`).
+- Users reported it in issue #214.
+
+### What was happening
+- `Config.load()` in `app/config.py` re-read and re-validated all 12 YAML files on
+  every launch — no memoization.
+- Introduced in commit `a1b2c3d`.
+
+### The fix
+- New `ConfigCache` (`app/cache.py`, commit `e4f5a6b`) writes a parsed blob to
+  `~/.cache/app/config.bin`.
+- Keyed by a hash of the source files' mtimes; `load()` returns the cached object
+  when the hash matches.
+
+### The payoff
+- Cold start dropped to ~0.9s on the same `bench/startup.py` run — about 50% faster.
+- Warm starts are unchanged.
+
+### Caveat
+- The cache is bypassed when `$APP_ENV=dev` so config edits take effect immediately.
+- Don't claim it's always on.
 """
 
 _RESEARCH_SYSTEM = (
@@ -71,15 +82,18 @@ _RESEARCH_SYSTEM = (
     "\n"
     "## Shape\n"
     "The pure structure of the post: a working headline, then the ordered sections "
-    "or beats. For each section, write ONE sentence saying what that section covers "
-    "and why it's there. No specifics yet — this is the skeleton only.\n"
+    "or beats as a bulleted list — one bullet per section, each a short bold label "
+    "and ONE sentence saying what it covers and why it's there. No specifics yet; "
+    "this is the skeleton only.\n"
     "\n"
     "## Details\n"
-    "Walk the Shape section by section, in the same order, and fill in the concrete "
-    "material the writer will actually use: real file/feature/function names, "
-    "before/after values, numbers, commit SHAs, snippets or quotes worth including, "
-    "and any caveats or things to avoid claiming. Tie each detail to the section it "
-    "belongs to. This is what makes the eventual post accurate and specific.\n"
+    "Walk the Shape section by section, in the same order. Give each section its own "
+    "`###` sub-heading whose title matches that section's label, and under it a few "
+    "short bullet points carrying the concrete material the writer will actually use: "
+    "real file/feature/function names, before/after values, numbers, commit SHAs, "
+    "snippets or quotes worth including, and any caveats or things to avoid claiming. "
+    "Keep it scannable — short bullets, one fact each, NOT paragraphs or a wall of "
+    "text. This is what makes the eventual post accurate and specific.\n"
     "\n"
     "Still an outline, not the post — do not write finished prose.\n"
     "\n"
@@ -100,9 +114,11 @@ Source refs: {", ".join(entry.source_refs) or "(none)"}
 The repo root is the working tree of: {repo_path}
 Start by exploring the source refs and relevant files. Then reply with the two
 sections described in your instructions:
-  1. ## Shape — the headline and ordered sections, one sentence per section.
-  2. ## Details — the same sections again, each filled with the concrete specifics
-     (real names, values, SHAs, snippets, caveats) the writer will draw on.
+  1. ## Shape — the headline and ordered sections as a bulleted list, one sentence
+     per section.
+  2. ## Details — the same sections again, each as its own ### sub-heading with short
+     bullet points of concrete specifics (real names, values, SHAs, snippets,
+     caveats) the writer will draw on. Keep it scannable, not a wall of text.
 Outline only — do not write the post.
 """
 
