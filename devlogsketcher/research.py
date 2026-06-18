@@ -33,12 +33,59 @@ def _describe_tool(name: str, args: dict) -> str:
     target = args.get("path") or args.get("pattern") or ""
     return f"{name}({target})" if target else name
 
+# A worked example, kept short, so the model's section layout and depth stay
+# consistent run to run. It's illustrative — the real outline mirrors this shape, not
+# its content.
+_RESEARCH_TEMPLATE = """\
+## Shape
+
+**Headline:** Cutting cold-start time in half by caching the parsed config
+
+1. **The hook** — open on the symptom users actually felt: slow startup.
+2. **What was happening** — explain why the config was re-parsed on every launch.
+3. **The fix** — introduce the on-disk cache and how it short-circuits the parse.
+4. **The payoff** — show the before/after numbers and what it means for users.
+5. **Caveat** — note the one case where the cache is intentionally skipped.
+
+## Details
+
+1. **The hook** — startup measured at ~1.8s on a cold run (see `bench/startup.py`);
+   users had complained in issue #214.
+2. **What was happening** — `Config.load()` in `app/config.py` re-read and re-validated
+   all 12 YAML files every launch; no memoization. Introduced in commit `a1b2c3d`.
+3. **The fix** — new `ConfigCache` (`app/cache.py`, commit `e4f5a6b`) writes a parsed
+   blob to `~/.cache/app/config.bin`, keyed by a hash of the source files' mtimes;
+   `load()` now returns the cached object when the hash matches.
+4. **The payoff** — cold start dropped to ~0.9s (same `bench/startup.py` run); ~50%
+   faster. Warm starts are unchanged.
+5. **Caveat** — the cache is bypassed when `$APP_ENV=dev` so config edits take effect
+   immediately; don't claim it's always on.
+"""
+
 _RESEARCH_SYSTEM = (
     "You research one devlog/social post idea against a codebase and produce a "
     "detailed OUTLINE — never the post prose. Use the file tools to confirm the "
-    "technical specifics (real file/feature names, before/after, concrete details). "
-    "When done, reply with the outline only: a working headline, the key sections/"
-    "beats, concrete details worth mentioning, and any caveats."
+    "technical specifics (real file/feature names, before/after, concrete details).\n"
+    "\n"
+    "Your reply has exactly two sections, in this order:\n"
+    "\n"
+    "## Shape\n"
+    "The pure structure of the post: a working headline, then the ordered sections "
+    "or beats. For each section, write ONE sentence saying what that section covers "
+    "and why it's there. No specifics yet — this is the skeleton only.\n"
+    "\n"
+    "## Details\n"
+    "Walk the Shape section by section, in the same order, and fill in the concrete "
+    "material the writer will actually use: real file/feature/function names, "
+    "before/after values, numbers, commit SHAs, snippets or quotes worth including, "
+    "and any caveats or things to avoid claiming. Tie each detail to the section it "
+    "belongs to. This is what makes the eventual post accurate and specific.\n"
+    "\n"
+    "Still an outline, not the post — do not write finished prose.\n"
+    "\n"
+    "Follow this format exactly:\n"
+    "\n"
+    + _RESEARCH_TEMPLATE
 )
 
 
@@ -51,7 +98,11 @@ Summary:     {entry.summary}
 Source refs: {", ".join(entry.source_refs) or "(none)"}
 
 The repo root is the working tree of: {repo_path}
-Start by exploring the source refs and relevant files, then write the outline.
+Start by exploring the source refs and relevant files. Then reply with the two
+sections described in your instructions:
+  1. ## Shape — the headline and ordered sections, one sentence per section.
+  2. ## Details — the same sections again, each filled with the concrete specifics
+     (real names, values, SHAs, snippets, caveats) the writer will draw on.
 Outline only — do not write the post.
 """
 

@@ -7,10 +7,11 @@ A stdlib-only HTTP server (no extra runtime deps) that exposes every CLI capabil
 shows what the CLI prints to the terminal. The frontend is a single static HTML file
 served at `/`.
 
-The planning `run` is resumable: it executes in a background thread (one at a time,
-tracked by ``RUNS``) that outlives the HTTP connection, so a reload or disconnect
-doesn't kill it. Clients reconnect via GET /api/run (status + buffered events) and
-GET /api/run/stream?since=N (replay from N, then follow live).
+The planning `run` and `research` runs are resumable: each executes in a background
+thread (one at a time per kind, tracked by ``RUNS`` / ``RESEARCH``) that outlives the
+HTTP connection, so a reload or disconnect doesn't kill it. Clients reconnect via
+GET /api/{run,research} (status + buffered events) and
+GET /api/{run,research}/stream?since=N (replay from N, then follow live).
 
 When any access key exists (`devlog keys add`), every API route except health and
 login/logout requires a valid key, presented via an HttpOnly cookie set at sign-in;
@@ -156,7 +157,10 @@ class RunManager:
         return job, True
 
 
+# Two independent single-slot managers: one planning run and one research run may be
+# in flight at once (different agents), but only one of each.
 RUNS = RunManager()
+RESEARCH = RunManager()
 
 
 def _plan_worker(job: RunJob, project: Project, params: dict) -> None:
@@ -206,6 +210,30 @@ def _plan_worker(job: RunJob, project: Project, params: dict) -> None:
         job.emit({"type": "error", "message": str(e)})
     except Exception as e:  # noqa: BLE001
         job.emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
+
+
+def _research_worker(job: RunJob, project: Project, params: dict) -> None:
+    """Research one entry, recording progress on ``job``. Runs in a daemon thread so
+    the run survives client disconnects and page reloads."""
+    entry_id = params["entry_id"]
+    backend = params.get("backend", "claude")
+    store = Store(project.db_path)
+    try:
+        target = store.get_entry(entry_id)
+        if target is None:
+            return job.emit({"type": "error", "message": f"no entry #{entry_id}"})
+        job.emit({"type": "progress",
+                  "message": f"Researching #{target.id}: {target.title}"})
+        entry = research_entry(
+            store, project, entry_id, backend=backend,
+            progress=lambda msg: job.emit({"type": "progress", "message": msg}))
+        job.emit({"type": "done", "entry": entry_dict(entry)})
+    except (DevlogError, ValueError) as e:
+        job.emit({"type": "error", "message": str(e)})
+    except Exception as e:  # noqa: BLE001
+        job.emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
+    finally:
+        store.close()
 
 
 def _valid_date(s: str) -> bool:
@@ -441,6 +469,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._stream_start()
                 return self._emit({"type": "idle"})
             return self._stream_job(job, since=int(q.get("since", ["0"])[0]))
+        if parts == ["api", "research"]:
+            job = RESEARCH.current()
+            return self._json({"running": bool(job and not job.done),
+                               "job": job.snapshot() if job else None})
+        if parts == ["api", "research", "stream"]:
+            job = RESEARCH.current()
+            if job is None:
+                self._stream_start()
+                return self._emit({"type": "idle"})
+            return self._stream_job(job, since=int(q.get("since", ["0"])[0]))
 
         # /api/projects/{id}/...
         if len(parts) >= 3 and parts[0] == "api" and parts[1] == "projects":
@@ -636,25 +674,21 @@ class Handler(BaseHTTPRequestHandler):
             pass  # client went away; the background run is unaffected
 
     def _stream_research(self, project: Project, entry_id: int, backend: str):
-        self._stream_start()
-        store = Store(project.db_path)
-        try:
-            target = store.get_entry(entry_id)
-            if target is None:
-                return self._emit({"type": "error", "message": f"no entry #{entry_id}"})
-            self._emit({"type": "progress", "message": f"Researching #{target.id}: {target.title}"})
-
-            def progress(msg):
-                self._emit({"type": "progress", "message": msg})
-
-            entry = research_entry(store, project, entry_id, backend=backend, progress=progress)
-            self._emit({"type": "done", "entry": entry_dict(entry)})
-        except (DevlogError, ValueError) as e:
-            self._emit({"type": "error", "message": str(e)})
-        except Exception as e:  # noqa: BLE001
-            self._emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
-        finally:
-            store.close()
+        """Dispatch a research run (or attach to the one in flight for this entry) and
+        stream its progress. Like the planner, the work runs in a background thread, so
+        a dropped connection or reload doesn't kill it — clients reconnect through
+        GET /api/research + /api/research/stream."""
+        current = RESEARCH.current()
+        if current is not None and not current.done and (
+                current.project_id != project.id
+                or current.params.get("entry_id") != entry_id):
+            self._stream_start()
+            return self._emit({"type": "error",
+                               "message": "a research run is already in progress — "
+                                          "wait for it to finish."})
+        params = {"entry_id": entry_id, "backend": backend}
+        job, _started = RESEARCH.start(project, params, _research_worker)
+        self._stream_job(job, since=0)
 
 
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:

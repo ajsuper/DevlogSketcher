@@ -315,7 +315,7 @@ async function onProjectChange(){
   await Promise.all([loadEntries(), loadTemplates(), loadBranches()]);
   populateFilters();
   if(STATE.view==="schedule") renderSchedule();
-  reconnectRun();  // follow an in-flight run for this project (no await — runs alongside)
+  reconnectJobs();  // follow an in-flight run/research for this project (no await)
 }
 
 async function loadBranches(){
@@ -581,20 +581,41 @@ async function doRun(){
   setBusy(false);
 }
 
-// On load / project switch: if a planning run for this project is still in flight
-// (or just finished), replay its progress and follow it live — so a reload or
-// disconnect doesn't lose the running agent.
-async function reconnectRun(){
-  let snap; try{ snap = await api("/api/run"); }catch(_){ return; }
-  const job = snap.job, p = currentProject();
-  if(!job || !p || job.project_id !== p.id) return;
-  logClear(); logLine("$ devlog run");
-  (job.events||[]).forEach(handleRunEvent);
-  if(!snap.running) return;
+function handleResearchEvent(ev){
+  if(ev.type==="progress") logLine(ev.message);
+  else if(ev.type==="error") logLine("error: "+ev.message,"err");
+  else if(ev.type==="done"){ logLine("✓ done","ok"); STATE.selected=ev.entry;
+    loadEntries(); if(ev.entry) showEntry(ev.entry.id); }
+  // heartbeat / idle events: keep-alive only, nothing to render
+}
+
+// On load / project switch: if a planning OR research run for this project is still
+// in flight (or just finished), replay its progress and follow it live — so a reload
+// or disconnect doesn't lose the running agent. Prefer a still-running job; among
+// finished ones, the most recent.
+async function reconnectJobs(){
+  const p = currentProject(); if(!p) return;
+  let run, research;
+  try{ run = await api("/api/run"); }catch(_){}
+  try{ research = await api("/api/research"); }catch(_){}
+  const cands = [];
+  if(run && run.job && run.job.project_id===p.id)
+    cands.push({snap:run, kind:"run", label:"$ devlog run", handler:handleRunEvent});
+  if(research && research.job && research.job.project_id===p.id)
+    cands.push({snap:research, kind:"research",
+                label:`$ devlog research ${research.job.params.entry_id}`,
+                handler:handleResearchEvent});
+  if(!cands.length) return;
+  cands.sort((a,b)=> (b.snap.running - a.snap.running) ||
+                     (b.snap.job.started_at - a.snap.job.started_at));
+  const c = cands[0], events = c.snap.job.events||[];
+  logClear(); logLine(c.label);
+  events.forEach(c.handler);
+  if(!c.snap.running) return;
   setBusy(true);
   try{
-    const r = await fetch(`/api/run/stream?since=${(job.events||[]).length}`);
-    await readStream(r, handleRunEvent);
+    const r = await fetch(`/api/${c.kind}/stream?since=${events.length}`);
+    await readStream(r, c.handler);
   }catch(_){ /* connection dropped; reload will reconnect again */ }
   setBusy(false);
 }
@@ -603,12 +624,7 @@ async function doResearch(id, backend){
   const p=currentProject();
   logClear(); logLine(`$ devlog research ${id}`); setBusy(true);
   try{
-    await stream(`/api/projects/${p.id}/research/${id}`, {backend}, ev=>{
-      if(ev.type==="progress") logLine(ev.message);
-      else if(ev.type==="error") logLine("error: "+ev.message,"err");
-      else if(ev.type==="done"){ logLine("✓ done","ok"); STATE.selected=ev.entry;
-        loadEntries(); showEntry(id); }
-    });
+    await stream(`/api/projects/${p.id}/research/${id}`, {backend}, handleResearchEvent);
   }catch(e){ logLine("error: "+e.message,"err"); }
   setBusy(false);
 }
