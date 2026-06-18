@@ -270,12 +270,10 @@ async function api(path, opts){
   return data;
 }
 
-// stream NDJSON from a POST, calling onEvent per line
-async function stream(path, body, onEvent){
-  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body||{})});
+// read an NDJSON response body, calling onEvent per line
+async function readStream(r, onEvent){
   if(r.status===401){ showLogin(); throw new Error("Sign in required"); }
-  if(!r.ok && !r.body){ throw new Error("request failed"); }
+  if(!r.body){ throw new Error("request failed"); }
   const reader = r.body.getReader(); const dec = new TextDecoder(); let buf="";
   while(true){
     const {done,value} = await reader.read(); if(done) break;
@@ -283,6 +281,12 @@ async function stream(path, body, onEvent){
     while((i=buf.indexOf("\n"))>=0){ const line=buf.slice(0,i); buf=buf.slice(i+1);
       if(line.trim()) onEvent(JSON.parse(line)); }
   }
+}
+// stream NDJSON from a POST, calling onEvent per line
+async function stream(path, body, onEvent){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body||{})});
+  await readStream(r, onEvent);
 }
 
 async function loadProjects(){
@@ -311,6 +315,7 @@ async function onProjectChange(){
   await Promise.all([loadEntries(), loadTemplates(), loadBranches()]);
   populateFilters();
   if(STATE.view==="schedule") renderSchedule();
+  reconnectRun();  // follow an in-flight run for this project (no await — runs alongside)
 }
 
 async function loadBranches(){
@@ -551,6 +556,18 @@ async function exportEntry(id, fmt){
   }catch(e){ toast(e.message,true); }
 }
 
+function handleRunEvent(ev){
+  if(ev.type==="progress") logLine(ev.message);
+  else if(ev.type==="error") logLine("error: "+ev.message,"err");
+  else if(ev.type==="done"){
+    if(ev.message) logLine(ev.message);
+    logLine(`✓ ${ev.summary.created} new, ${ev.summary.updated} updated.`,"ok");
+    (ev.entries||[]).forEach(e=>logLine(`  [${e.action}] #${e.id} ${e.title}`));
+    loadEntries();
+  }
+  // heartbeat / idle events: keep-alive only, nothing to render
+}
+
 async function doRun(){
   const p=currentProject(); if(!p){ toast("Link a repo first",true); return; }
   logClear(); logLine("$ devlog run"); setBusy(true);
@@ -559,17 +576,26 @@ async function doRun(){
       window: parseInt($("#runWindow").value)||30, backend:$("#runBackend").value,
       branch: $("#runBranch").value || undefined,
       target: Math.max(0, parseInt($("#runTarget").value)||0)
-    }, ev=>{
-      if(ev.type==="progress") logLine(ev.message);
-      else if(ev.type==="error") logLine("error: "+ev.message,"err");
-      else if(ev.type==="done"){
-        if(ev.message) logLine(ev.message);
-        logLine(`✓ ${ev.summary.created} new, ${ev.summary.updated} updated.`,"ok");
-        (ev.entries||[]).forEach(e=>logLine(`  [${e.action}] #${e.id} ${e.title}`));
-        loadEntries();
-      }
-    });
+    }, handleRunEvent);
   }catch(e){ logLine("error: "+e.message,"err"); }
+  setBusy(false);
+}
+
+// On load / project switch: if a planning run for this project is still in flight
+// (or just finished), replay its progress and follow it live — so a reload or
+// disconnect doesn't lose the running agent.
+async function reconnectRun(){
+  let snap; try{ snap = await api("/api/run"); }catch(_){ return; }
+  const job = snap.job, p = currentProject();
+  if(!job || !p || job.project_id !== p.id) return;
+  logClear(); logLine("$ devlog run");
+  (job.events||[]).forEach(handleRunEvent);
+  if(!snap.running) return;
+  setBusy(true);
+  try{
+    const r = await fetch(`/api/run/stream?since=${(job.events||[]).length}`);
+    await readStream(r, handleRunEvent);
+  }catch(_){ /* connection dropped; reload will reconnect again */ }
   setBusy(false);
 }
 

@@ -7,6 +7,11 @@ A stdlib-only HTTP server (no extra runtime deps) that exposes every CLI capabil
 shows what the CLI prints to the terminal. The frontend is a single static HTML file
 served at `/`.
 
+The planning `run` is resumable: it executes in a background thread (one at a time,
+tracked by ``RUNS``) that outlives the HTTP connection, so a reload or disconnect
+doesn't kill it. Clients reconnect via GET /api/run (status + buffered events) and
+GET /api/run/stream?since=N (replay from N, then follow live).
+
 When any access key exists (`devlog keys add`), every API route except health and
 login/logout requires a valid key, presented via an HttpOnly cookie set at sign-in;
 with no keys configured the server stays open (localhost-only personal use).
@@ -70,6 +75,137 @@ from .templates import (
 )
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+class RunJob:
+    """A single, resumable planning run. Progress events accumulate in a buffer so a
+    client that reloads or reconnects can replay from any index and then follow live —
+    the work runs in a daemon thread that outlives any one HTTP connection."""
+
+    def __init__(self, job_id: int, project_id: str, params: dict):
+        self.id = job_id
+        self.project_id = project_id
+        self.params = params
+        self.events: list[dict] = []
+        self.done = False
+        self.started_at = time.time()
+        self._cond = threading.Condition()
+
+    def emit(self, event: dict) -> None:
+        with self._cond:
+            self.events.append(event)
+            if event.get("type") in ("done", "error"):
+                self.done = True
+            self._cond.notify_all()
+
+    def follow(self, since: int = 0, heartbeat: float = 10.0):
+        """Yield buffered events from index ``since`` onward, then live ones as they
+        arrive; yield ``None`` as a heartbeat when idle so the caller can keep the
+        connection warm and notice client disconnects. Returns once the job is done
+        and the caller has caught up."""
+        index = max(0, since)
+        while True:
+            batch: list[dict] = []
+            beat = False
+            with self._cond:
+                while index >= len(self.events) and not self.done:
+                    if not self._cond.wait(timeout=heartbeat):
+                        beat = True
+                        break
+                if index < len(self.events):
+                    batch = self.events[index:]
+                    index += len(batch)
+                elif self.done:
+                    return
+            for ev in batch:
+                yield ev
+            if beat:
+                yield None
+
+    def snapshot(self) -> dict:
+        with self._cond:
+            return {"id": self.id, "project_id": self.project_id,
+                    "params": self.params, "done": self.done,
+                    "running": not self.done, "started_at": self.started_at,
+                    "events": list(self.events)}
+
+
+class RunManager:
+    """One planning run at a time across the whole server. Dispatching while a run is
+    in flight returns the existing job instead of starting a second."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._job: RunJob | None = None
+        self._seq = 0
+
+    def current(self) -> RunJob | None:
+        with self._lock:
+            return self._job
+
+    def start(self, project, params, worker) -> tuple[RunJob, bool]:
+        """Start a new job, or return the in-flight one. The bool is True when a new
+        job was started, False when an already-running job was attached to."""
+        with self._lock:
+            if self._job is not None and not self._job.done:
+                return self._job, False
+            self._seq += 1
+            job = RunJob(self._seq, project.id, params)
+            self._job = job
+        threading.Thread(target=worker, args=(job, project, params), daemon=True).start()
+        return job, True
+
+
+RUNS = RunManager()
+
+
+def _plan_worker(job: RunJob, project: Project, params: dict) -> None:
+    """Run the planner end to end, recording progress on ``job``. Runs in a daemon
+    thread so the run survives client disconnects and page reloads."""
+    window = params["window"]
+    backend = params["backend"]
+    branch = params.get("branch")
+    target = params.get("target", 0)
+    try:
+        digest = build_digest(project.repo_path, window, ref=branch)
+        job.emit({"type": "progress",
+                  "message": f"Scanning `{digest.branch}` (last {window} days)…"})
+        job.emit({"type": "progress",
+                  "message": f"{digest.num_commits} commit(s) in window."})
+        if digest.num_commits == 0:
+            return job.emit({"type": "done", "entries": [],
+                             "summary": {"created": 0, "updated": 0, "run_id": None},
+                             "message": "No commits in window — nothing to plan."})
+        store = Store(project.db_path)
+        try:
+            templates = load_templates(project.templates_dir)
+            existing = store.list_entries()
+            run_id = store.create_run(window_days=digest.window_days, since=digest.since,
+                                      num_commits=digest.num_commits, branch=digest.branch)
+            job.emit({"type": "progress",
+                      "message": f"Reviewing against {len(existing)} existing idea(s)."})
+            label = "heuristic stub (offline)" if backend == "heuristic" else "Claude (Opus 4.8)"
+            target_note = f" (target: {target} new)" if target else ""
+            job.emit({"type": "progress",
+                      "message": f"Planning with {label}{target_note} — this can take a minute…"})
+            prompt_template = load_planner_prompt_template(project)
+            branch_note = get_branch_note(project, digest.branch)
+            proposals = plan(digest, store, templates, backend=backend,
+                             prompt_template=prompt_template, branch_note=branch_note,
+                             target=target,
+                             progress=lambda msg: job.emit({"type": "progress", "message": msg}))
+            results = apply_proposals(store, proposals, run_id, branch=digest.branch)
+            entries = [entry_dict(store.get_entry(eid), action) for eid, action in results]
+            created = sum(1 for _, a in results if a == "created")
+            updated = sum(1 for _, a in results if a == "updated")
+            job.emit({"type": "done", "entries": entries,
+                      "summary": {"created": created, "updated": updated, "run_id": run_id}})
+        finally:
+            store.close()
+    except DevlogError as e:
+        job.emit({"type": "error", "message": str(e)})
+    except Exception as e:  # noqa: BLE001
+        job.emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
 
 
 def _valid_date(s: str) -> bool:
@@ -295,6 +431,16 @@ class Handler(BaseHTTPRequestHandler):
                                "authed": self._current_key() is not None})
         if parts == ["api", "projects"]:
             return self._json([project_dict(p) for p in load_registry().values()])
+        if parts == ["api", "run"]:
+            job = RUNS.current()
+            return self._json({"running": bool(job and not job.done),
+                               "job": job.snapshot() if job else None})
+        if parts == ["api", "run", "stream"]:
+            job = RUNS.current()
+            if job is None:
+                self._stream_start()
+                return self._emit({"type": "idle"})
+            return self._stream_job(job, since=int(q.get("since", ["0"])[0]))
 
         # /api/projects/{id}/...
         if len(parts) >= 3 and parts[0] == "api" and parts[1] == "projects":
@@ -465,43 +611,29 @@ class Handler(BaseHTTPRequestHandler):
     # -- streaming operations --
     def _stream_run(self, project: Project, window: int, backend: str,
                     branch: str | None = None, target: int = 0):
+        """Dispatch a planning run (or attach to the one already in flight) and stream
+        its progress. The run itself executes in a background thread via RUNS, so a
+        dropped connection or page reload doesn't kill it — the client just reconnects
+        through GET /api/run + /api/run/stream."""
+        current = RUNS.current()
+        if current is not None and not current.done and current.project_id != project.id:
+            self._stream_start()
+            return self._emit({"type": "error",
+                               "message": "a planning run is already in progress for "
+                                          "another project — wait for it to finish."})
+        params = {"window": window, "backend": backend, "branch": branch, "target": target}
+        job, _started = RUNS.start(project, params, _plan_worker)
+        self._stream_job(job, since=0)
+
+    def _stream_job(self, job: RunJob, since: int = 0):
+        """Stream a job's events from ``since`` to the client until it finishes. If the
+        client disconnects, the worker thread keeps running — we just stop writing."""
         self._stream_start()
         try:
-            digest = build_digest(project.repo_path, window, ref=branch)
-            self._emit({"type": "progress",
-                        "message": f"Scanning `{digest.branch}` (last {window} days)…"})
-            self._emit({"type": "progress", "message": f"{digest.num_commits} commit(s) in window."})
-            if digest.num_commits == 0:
-                return self._emit({"type": "done", "entries": [],
-                                   "summary": {"created": 0, "updated": 0, "run_id": None},
-                                   "message": "No commits in window — nothing to plan."})
-            store = Store(project.db_path)
-            templates = load_templates(project.templates_dir)
-            existing = store.list_entries()
-            run_id = store.create_run(window_days=digest.window_days, since=digest.since,
-                                      num_commits=digest.num_commits, branch=digest.branch)
-            self._emit({"type": "progress", "message": f"Reviewing against {len(existing)} existing idea(s)."})
-            label = "heuristic stub (offline)" if backend == "heuristic" else "Claude (Opus 4.8)"
-            target_note = f" (target: {target} new)" if target else ""
-            self._emit({"type": "progress",
-                        "message": f"Planning with {label}{target_note} — this can take a minute…"})
-            prompt_template = load_planner_prompt_template(project)
-            branch_note = get_branch_note(project, digest.branch)
-            proposals = plan(digest, store, templates, backend=backend,
-                             prompt_template=prompt_template, branch_note=branch_note,
-                             target=target,
-                             progress=lambda msg: self._emit({"type": "progress", "message": msg}))
-            results = apply_proposals(store, proposals, run_id, branch=digest.branch)
-            entries = [entry_dict(store.get_entry(eid), action) for eid, action in results]
-            store.close()
-            created = sum(1 for _, a in results if a == "created")
-            updated = sum(1 for _, a in results if a == "updated")
-            self._emit({"type": "done", "entries": entries,
-                        "summary": {"created": created, "updated": updated, "run_id": run_id}})
-        except DevlogError as e:
-            self._emit({"type": "error", "message": str(e)})
-        except Exception as e:  # noqa: BLE001
-            self._emit({"type": "error", "message": f"{type(e).__name__}: {e}"})
+            for ev in job.follow(since=since):
+                self._emit({"type": "heartbeat"} if ev is None else ev)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client went away; the background run is unaffected
 
     def _stream_research(self, project: Project, entry_id: int, backend: str):
         self._stream_start()
