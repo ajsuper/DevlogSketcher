@@ -34,7 +34,12 @@
   button:hover { border-color:var(--accent); }
   button.primary { background:var(--accent); color:#0b0e14; border-color:var(--accent); font-weight:600; }
   button.primary:hover { filter:brightness(1.08); }
+  button.danger { color:var(--bad); }
+  button.danger:hover { border-color:var(--bad); }
+  button.mini { padding:3px 7px; font-size:12px; }
   button:disabled { opacity:.5; cursor:not-allowed; }
+  textarea.editor { width:100%; min-height:46vh; resize:vertical;
+    font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .muted { color:var(--muted); }
   .pill { font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid var(--line);
@@ -48,7 +53,27 @@
   ul.entries li:hover { border-color:var(--accent); }
   ul.entries li.active { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
   .etitle { font-weight:600; }
-  .emeta { font-size:12px; color:var(--muted); margin-top:2px; }
+  .emeta { font-size:12px; color:var(--muted); margin-top:4px; display:flex;
+           gap:6px; align-items:center; flex-wrap:wrap; }
+  .age { margin-left:auto; white-space:nowrap; cursor:default; }
+  .age.old { color:var(--warn); }
+  .age.old::before { content:"⏳ "; }
+  .pill.branch::before { content:"⎇ "; }
+  .pill.sched { color:var(--accent2); }
+  .pill.sched::before { content:"📅 "; }
+  .tabs { display:flex; gap:4px; margin-left:8px; }
+  .tab { background:transparent; border:1px solid transparent; border-radius:8px; padding:6px 12px; }
+  .tab.active { background:var(--panel2); border-color:var(--line); color:var(--accent); font-weight:600; }
+  .agenda-group { margin-bottom:16px; }
+  .agenda-group h3 { font-size:12px; text-transform:uppercase; letter-spacing:.5px;
+                     color:var(--muted); margin:0 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .agenda-row { display:flex; gap:10px; align-items:center; padding:8px 6px; border-bottom:1px solid var(--line); }
+  .agenda-row:hover { background:var(--panel2); }
+  .agenda-date { font:12px ui-monospace,Menlo,monospace; color:var(--muted); white-space:nowrap; }
+  .agenda-row.overdue .agenda-date { color:var(--bad); }
+  .agenda-row.today .agenda-date { color:var(--warn); }
+  .agenda-title { flex:1; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .agenda-title:hover { color:var(--accent); }
   pre { white-space:pre-wrap; word-wrap:break-word; background:var(--panel2);
         border:1px solid var(--line); border-radius:8px; padding:10px; margin:0;
         max-height:55vh; overflow:auto; font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
@@ -58,14 +83,41 @@
   #console .err { color:var(--bad); } #console .ok { color:var(--accent2); }
   .field { display:flex; flex-direction:column; gap:3px; }
   .field label { font-size:11px; color:var(--muted); }
-  .hidden { display:none; }
+  .hidden { display:none !important; }
+  .bad { color:var(--bad); }
+  .overlay { position:fixed; inset:0; background:rgba(8,10,16,.82);
+             display:flex; align-items:center; justify-content:center; z-index:50; padding:16px; }
+  .card.login { width:340px; max-width:100%; display:flex; flex-direction:column; gap:12px;
+                text-align:center; padding:26px 24px; }
+  .card.login h1 { font-size:20px; margin:0; letter-spacing:.3px; }
+  .card.login h1 span { color:var(--accent); }
+  .card.login p { margin:0; }
+  .card.login input { text-align:center; }
+  .card.login .bad { min-height:1em; font-size:12.5px; }
   .toast { position:fixed; bottom:16px; right:16px; background:var(--panel2);
            border:1px solid var(--line); border-left:3px solid var(--accent);
            padding:10px 14px; border-radius:8px; max-width:360px; }
   .toast.err { border-left-color:var(--bad); }
   .detail-field { margin-bottom:10px; }
-  .detail-field .k { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); }
+  .detail-field .k { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:3px; }
   code.ref { font-size:11.5px; }
+  /* rendered markdown */
+  .md { line-height:1.6; }
+  .md > *:first-child { margin-top:0; }
+  .md > *:last-child { margin-bottom:0; }
+  .md h1,.md h2,.md h3,.md h4,.md h5,.md h6 { margin:14px 0 6px; line-height:1.3; }
+  .md h1 { font-size:18px; } .md h2 { font-size:16px; } .md h3 { font-size:14px; }
+  .md h4,.md h5,.md h6 { font-size:13px; color:var(--muted); }
+  .md p { margin:8px 0; }
+  .md ul,.md ol { margin:6px 0; padding-left:22px; }
+  .md li { margin:2px 0; }
+  .md code { background:var(--panel2); border:1px solid var(--line); border-radius:4px;
+    padding:.5px 4px; font:12px ui-monospace,Menlo,monospace; }
+  .md pre.md-code { background:#0c0e14; border:1px solid var(--line); border-radius:8px;
+    padding:10px; overflow:auto; }
+  .md pre.md-code code { background:none; border:none; padding:0; }
+  .md blockquote { margin:8px 0; padding:2px 12px; border-left:3px solid var(--line); color:var(--muted); }
+  .md a { color:var(--accent); }
 </style>
 </head>
 <body>
@@ -76,9 +128,26 @@
     <button id="refreshBtn" title="Reload projects & entries">↻</button>
     <button id="linkToggle">＋ Link repo</button>
   </div>
+  <div class="tabs">
+    <button id="tabIdeas" class="tab active">Ideas</button>
+    <button id="tabSchedule" class="tab">📅 Schedule</button>
+  </div>
   <div class="grow"></div>
   <span id="repoLabel" class="muted"></span>
+  <button id="logoutBtn" class="hidden">Sign out</button>
 </header>
+
+<!-- Login gate (shown only when access keys are configured) -->
+<div id="loginOverlay" class="overlay hidden">
+  <form class="card login" id="loginForm">
+    <h1>Devlog<span>Sketcher</span></h1>
+    <p class="muted">Enter your access key to continue.</p>
+    <input id="loginKey" type="password" placeholder="access key"
+           autocomplete="current-password" autocapitalize="off" spellcheck="false">
+    <button class="primary" id="loginBtn" type="submit">Sign in</button>
+    <div id="loginErr" class="bad"></div>
+  </form>
+</div>
 
 <!-- Link / relink form -->
 <div id="linkForm" class="card hidden" style="margin:16px;">
@@ -103,16 +172,24 @@
     <div class="card">
       <h2>Generate ideas — run</h2>
       <div class="row">
+        <div class="field"><label>Branch</label>
+          <select id="runBranch" title="Branch to review"></select></div>
         <div class="field"><label>Look-back (days)</label>
           <input type="number" id="runWindow" value="30" min="1"></div>
+        <div class="field"><label title="Aim for N new entries; 0 = no target. Quality always wins.">Target # entries</label>
+          <input type="number" id="runTarget" value="0" min="0" style="width:70px;"></div>
         <div class="field"><label>Backend</label>
           <select id="runBackend">
             <option value="claude">Claude (real)</option>
             <option value="heuristic">heuristic (offline stub)</option>
           </select></div>
         <button class="primary" id="runBtn">▶ Run</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="branchNoteBtn">✎ Branch instructions</button>
         <button id="digestBtn">View digest</button>
-        <button id="promptBtn">View planner prompt</button>
+        <button id="promptBtn">View prompt</button>
+        <button id="promptEditBtn">✎ Edit prompt</button>
       </div>
     </div>
 
@@ -123,7 +200,9 @@
         <div class="field"><label>Status</label>
           <select id="filterStatus"><option value="">all</option></select></div>
         <div class="field"><label>Audience</label>
-          <input id="filterAudience" placeholder="all" size="10"></div>
+          <select id="filterAudience"><option value="">all</option></select></div>
+        <div class="field"><label>Branch</label>
+          <select id="filterBranch"><option value="">all</option></select></div>
         <button id="applyFilter">Filter</button>
       </div>
       <ul class="entries" id="entryList"></ul>
@@ -135,8 +214,9 @@
       <h2>Audience templates</h2>
       <div id="templateList" class="muted">—</div>
       <div class="row" style="margin-top:10px;">
+        <button class="primary" id="newTplBtn">＋ New template</button>
         <button id="reseedBtn">Reseed built-ins</button>
-        <span class="muted">edits backed up to &lt;name&gt;.md.bak</span>
+        <span class="muted">reseed backs up edits to &lt;name&gt;.md.bak</span>
       </div>
     </div>
   </div>
@@ -156,11 +236,22 @@
   </div>
 </main>
 
+<!-- Schedule view -->
+<section id="scheduleView" class="hidden" style="padding:16px;">
+  <div class="card">
+    <h2>Publishing schedule</h2>
+    <p class="muted" style="margin-top:0;">Assign a target publish date to each idea.
+      DevlogSketcher doesn't post for you — this is your content calendar.</p>
+    <div id="agenda"></div>
+  </div>
+</section>
+
 <div id="toast" class="toast hidden"></div>
 
 <script>
 const $ = s => document.querySelector(s);
-let STATE = { projects:[], projectId:null, statuses:[], entries:[], selected:null };
+let STATE = { projects:[], projectId:null, statuses:[], entries:[], selected:null,
+  templates:[], branches:[], branchNotes:{}, view:"ideas" };
 
 function toast(msg, isErr){ const t=$("#toast"); t.textContent=msg;
   t.className="toast"+(isErr?" err":""); t.classList.remove("hidden");
@@ -172,6 +263,7 @@ function logClear(){ $("#console").innerHTML=""; }
 
 async function api(path, opts){
   const r = await fetch(path, opts);
+  if(r.status===401){ showLogin(); throw new Error("Sign in required"); }
   const ct = r.headers.get("content-type")||"";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if(!r.ok){ const msg = (data && data.error) || r.statusText; throw new Error(msg); }
@@ -182,6 +274,7 @@ async function api(path, opts){
 async function stream(path, body, onEvent){
   const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify(body||{})});
+  if(r.status===401){ showLogin(); throw new Error("Sign in required"); }
   if(!r.ok && !r.body){ throw new Error("request failed"); }
   const reader = r.body.getReader(); const dec = new TextDecoder(); let buf="";
   while(true){
@@ -215,16 +308,55 @@ function currentProject(){ return STATE.projects.find(p=>p.id===STATE.projectId)
 async function onProjectChange(){
   const p=currentProject(); if(!p) return;
   $("#repoLabel").textContent = p.repo_path;
-  await Promise.all([loadEntries(), loadTemplates()]);
+  await Promise.all([loadEntries(), loadTemplates(), loadBranches()]);
+  populateFilters();
+  if(STATE.view==="schedule") renderSchedule();
+}
+
+async function loadBranches(){
+  const p=currentProject(); if(!p) return;
+  const sel=$("#runBranch");
+  try{
+    const d = await api(`/api/projects/${p.id}/branches`);
+    STATE.branches = d.branches||[]; STATE.branchNotes = d.notes||{};
+    sel.innerHTML="";
+    if(!STATE.branches.length){ sel.add(new Option(d.current||"current", "")); }
+    for(const b of STATE.branches){
+      const label = b + (STATE.branchNotes[b] ? " ✎" : "");
+      sel.add(new Option(label, b));
+    }
+    sel.value = STATE.branches.includes(d.current) ? d.current : (STATE.branches[0]||"");
+  }catch(e){ sel.innerHTML=""; sel.add(new Option("current","")); }
 }
 
 async function loadEntries(){
   const p=currentProject(); if(!p) return;
   const params=new URLSearchParams();
   const st=$("#filterStatus").value; const au=$("#filterAudience").value.trim();
+  const br=$("#filterBranch").value.trim();
   if(st) params.set("status",st); if(au) params.set("audience",au);
+  if(br) params.set("branch",br);
   STATE.entries = await api(`/api/projects/${p.id}/entries?`+params);
   renderEntries(STATE.entries);
+  populateFilters();
+}
+
+// Fill a <select> with options, preserving the current selection if still valid.
+function fillSelect(sel, values){
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">all</option>';
+  for(const v of values) sel.add(new Option(v, v));
+  sel.value = values.includes(prev) ? prev : "";
+}
+// Audience options come from the project's templates; branch options from the repo's
+// branches. Entry values are unioned in so nothing currently in use drops off the list.
+function populateFilters(){
+  const auds = new Set((STATE.templates||[]).map(t=>t.audience));
+  (STATE.entries||[]).forEach(e=>{ if(e.audience) auds.add(e.audience); });
+  fillSelect($("#filterAudience"), [...auds].sort());
+  const brs = new Set(STATE.branches||[]);
+  (STATE.entries||[]).forEach(e=>{ if(e.branch) brs.add(e.branch); });
+  fillSelect($("#filterBranch"), [...brs].sort());
 }
 
 function renderEntries(entries){
@@ -234,9 +366,14 @@ function renderEntries(entries){
     const li=document.createElement("li");
     li.dataset.id=e.id;
     if(STATE.selected && STATE.selected.id===e.id) li.classList.add("active");
+    const old = ageDays(e.created_at) > OLD_DAYS;
+    const branchPill = e.branch ? `<span class="pill branch">${escapeHtml(e.branch)}</span>` : "";
+    const schedPill = e.scheduled_for ? `<span class="pill sched">${escapeHtml(e.scheduled_for)}</span>` : "";
     li.innerHTML = `<div class="etitle">#${e.id} ${escapeHtml(e.title)}</div>
       <div class="emeta"><span class="pill">${e.audience}</span>
-      <span class="pill status-${e.status}">${e.status}</span></div>`;
+      <span class="pill status-${e.status}">${e.status}</span>
+      ${branchPill}${schedPill}
+      <span class="age${old?' old':''}" title="created ${escapeHtml(fmtDate(e.created_at))}">${timeAgo(e.created_at)}</span></div>`;
     li.onclick=()=>showEntry(e.id);
     ul.appendChild(li);
   }
@@ -246,23 +383,49 @@ async function showEntry(id){
   const p=currentProject();
   const e = await api(`/api/projects/${p.id}/entries/${id}`);
   STATE.selected=e; renderEntries(STATE.entries);
+  $("#viewer").className="";
   $("#viewerTitle").textContent = `#${e.id} — ${e.title}`;
   const opts = STATE.statuses.map(s=>`<option ${s===e.status?"selected":""}>${s}</option>`).join("");
   const refs = (e.source_refs||[]).map(r=>`<code class="ref pill">${escapeHtml(r)}</code>`).join(" ") || '<span class="muted">none</span>';
+  const outline = e.outline
+    ? `<div class="md">${mdToHtml(e.outline)}</div>`
+    : '<span class="muted">not researched yet — click Research</span>';
+  const created = `${escapeHtml(fmtDate(e.created_at))} <span class="muted">(${timeAgo(e.created_at)})</span>`;
+  const updated = e.updated_at && e.updated_at!==e.created_at
+    ? ` · updated ${escapeHtml(fmtDate(e.updated_at))} <span class="muted">(${timeAgo(e.updated_at)})</span>` : "";
+  const staleNote = ageDays(e.created_at) > OLD_DAYS
+    ? ` <span class="age old" style="margin:0;" title="created over ${OLD_DAYS} days ago">may be stale</span>` : "";
+  const branchLine = e.branch ? ` <span class="pill branch">${escapeHtml(e.branch)}</span>` : "";
   $("#viewer").innerHTML = `
-    <div class="detail-field"><div class="k">Audience</div>${e.audience}</div>
+    <div class="detail-field"><div class="k">Audience</div>${e.audience}${branchLine}</div>
+    <div class="detail-field"><div class="k">Created</div>${created}${updated}${staleNote}</div>
     <div class="detail-field"><div class="k">Status</div>
       <div class="row"><select id="statusSel">${opts}</select>
       <button id="statusBtn">Set status</button>
       <div class="grow"></div>
       <select id="resBackend"><option value="claude">Claude (real)</option><option value="stub">stub (offline)</option></select>
       <button class="primary" id="researchBtn">🔬 Research</button></div></div>
-    <div class="detail-field"><div class="k">Summary</div>${escapeHtml(e.summary)||'<span class="muted">—</span>'}</div>
+    <div class="detail-field"><div class="k">Summary</div><div class="md">${mdToHtml(e.summary)}</div></div>
     <div class="detail-field"><div class="k">Source refs</div>${refs}</div>
-    <div class="detail-field"><div class="k">Outline</div>
-      <pre>${escapeHtml(e.outline)|| '(not researched yet — click Research)'}</pre></div>`;
+    <div class="detail-field"><div class="k">Outline</div>${outline}</div>
+    <div class="detail-field"><div class="k">Schedule (publish date)</div>
+      <div class="row"><input type="date" id="schedDate" value="${escapeHtml(e.scheduled_for||'')}">
+        <button id="schedBtn">Set</button>
+        <button id="schedClear">Clear</button></div></div>
+    <div class="detail-field"><div class="k">Export</div>
+      <div class="row"><select id="exportFmt">
+        <option value="md">Markdown (.md)</option>
+        <option value="txt">Plain text (.txt)</option>
+        <option value="html">HTML (.html)</option>
+      </select><button id="exportBtn">⤓ Export</button>
+      <div class="grow"></div>
+      <button class="danger" id="deleteBtn">🗑 Delete</button></div></div>`;
   $("#statusBtn").onclick=()=>setStatus(e.id, $("#statusSel").value);
   $("#researchBtn").onclick=()=>doResearch(e.id, $("#resBackend").value);
+  $("#exportBtn").onclick=()=>exportEntry(e.id, $("#exportFmt").value);
+  $("#schedBtn").onclick=()=>scheduleEntry(e.id, $("#schedDate").value);
+  $("#schedClear").onclick=()=>scheduleEntry(e.id, "");
+  $("#deleteBtn").onclick=()=>deleteEntry(e.id, e.title);
 }
 
 async function setStatus(id, status){
@@ -274,12 +437,128 @@ async function setStatus(id, status){
   }catch(e){ toast(e.message,true); }
 }
 
+async function scheduleEntry(id, date){
+  const p=currentProject();
+  try{
+    const e=await api(`/api/projects/${p.id}/entries/${id}/schedule`, {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({scheduled_for:date})});
+    toast(date?`#${id} scheduled ${date}`:`#${id} unscheduled`);
+    await loadEntries();
+    if(STATE.view==="schedule") renderSchedule();
+    else showEntry(id);
+  }catch(e){ toast(e.message,true); }
+}
+
+async function deleteEntry(id, title){
+  const p=currentProject();
+  if(!confirm(`Delete #${id} "${title}"? This can't be undone.`)) return;
+  try{
+    await api(`/api/projects/${p.id}/entries/${id}/delete`, {method:"POST"});
+    toast(`Deleted #${id}`); STATE.selected=null; clearViewer();
+    await loadEntries();
+    if(STATE.view==="schedule") renderSchedule();
+  }catch(e){ toast(e.message,true); }
+}
+
+async function editBranchNote(){
+  const p=currentProject(); if(!p){ toast("Link a repo first",true); return; }
+  const branch=$("#runBranch").value || (STATE.branches[0]||"");
+  if(!branch){ toast("No branch selected",true); return; }
+  const d=await api(`/api/projects/${p.id}/branches/${encodeURIComponent(branch)}`);
+  switchView("ideas");
+  $("#viewer").className="";
+  $("#viewerTitle").textContent=`Branch instructions: ${branch}`;
+  $("#viewer").innerHTML=`
+    <div class="muted" style="margin-bottom:8px;">Extra framing the planner uses when
+      reviewing <code>${escapeHtml(branch)}</code> — e.g. "frame as work-in-progress" for a
+      dev branch, or "frame as shipped and available now" for production. Leave empty for none.</div>
+    <textarea id="bnBody" class="editor" spellcheck="false">${escapeHtml(d.note||"")}</textarea>
+    <div class="row" style="margin-top:8px;">
+      <button class="primary" id="bnSave">Save</button>
+      <button id="bnCancel">Cancel</button>
+      <div class="grow"></div>
+      <button class="danger" id="bnClear">Clear</button>
+    </div>`;
+  $("#bnSave").onclick=()=>saveBranchNote(branch, $("#bnBody").value);
+  $("#bnCancel").onclick=clearViewer;
+  $("#bnClear").onclick=()=>saveBranchNote(branch, "");
+}
+async function saveBranchNote(branch, note){
+  const p=currentProject();
+  try{
+    await api(`/api/projects/${p.id}/branches/${encodeURIComponent(branch)}`, {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({note})});
+    toast(note.trim()?`Saved instructions for ${branch}`:`Cleared instructions for ${branch}`);
+    await loadBranches();
+    clearViewer();
+  }catch(e){ toast(e.message,true); }
+}
+
+// --- schedule view ---
+function switchView(view){
+  STATE.view=view;
+  $("#tabIdeas").classList.toggle("active", view==="ideas");
+  $("#tabSchedule").classList.toggle("active", view==="schedule");
+  document.querySelector("main").classList.toggle("hidden", view!=="ideas");
+  $("#scheduleView").classList.toggle("hidden", view!=="schedule");
+  if(view==="schedule") renderSchedule();
+}
+async function renderSchedule(){
+  const p=currentProject(); const box=$("#agenda");
+  if(!p){ box.innerHTML='<span class="muted">Link a repo first.</span>'; return; }
+  const all = await api(`/api/projects/${p.id}/entries`);
+  const today = new Date().toISOString().slice(0,10);
+  const scheduled = all.filter(e=>e.scheduled_for).sort((a,b)=>a.scheduled_for<b.scheduled_for?-1:1);
+  const groups = [
+    ["Overdue", scheduled.filter(e=>e.scheduled_for<today), "overdue"],
+    ["Today", scheduled.filter(e=>e.scheduled_for===today), "today"],
+    ["Upcoming", scheduled.filter(e=>e.scheduled_for>today), ""],
+    ["Unscheduled", all.filter(e=>!e.scheduled_for), ""],
+  ];
+  let html="";
+  for(const [name, items, cls] of groups){
+    if(!items.length) continue;
+    html+=`<div class="agenda-group"><h3>${name} (${items.length})</h3>`;
+    for(const e of items){
+      html+=`<div class="agenda-row ${cls}">
+        <input type="date" class="agdate" data-id="${e.id}" value="${escapeHtml(e.scheduled_for||"")}">
+        <span class="pill status-${e.status}">${e.status}</span>
+        <span class="agenda-title" data-id="${e.id}">#${e.id} ${escapeHtml(e.title)}</span>
+        ${e.branch?`<span class="pill branch">${escapeHtml(e.branch)}</span>`:""}
+      </div>`;
+    }
+    html+=`</div>`;
+  }
+  box.innerHTML = html || '<span class="muted">No ideas yet — run the planner first.</span>';
+  box.querySelectorAll(".agdate").forEach(inp=>inp.onchange=()=>scheduleEntry(inp.dataset.id, inp.value));
+  box.querySelectorAll(".agenda-title").forEach(t=>t.onclick=()=>{
+    switchView("ideas"); showEntry(parseInt(t.dataset.id)); });
+}
+
+async function exportEntry(id, fmt){
+  const p=currentProject(); if(!p) return;
+  try{
+    const r=await fetch(`/api/projects/${p.id}/entries/${id}/export?format=${encodeURIComponent(fmt)}`);
+    if(!r.ok){ let m=r.statusText; try{ m=(await r.json()).error||m; }catch(_){} throw new Error(m); }
+    const blob=await r.blob();
+    const dispo=r.headers.get("Content-Disposition")||"";
+    const match=dispo.match(/filename="?([^"]+)"?/);
+    const name=match?match[1]:`entry-${id}.${fmt}`;
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast(`Exported ${name}`);
+  }catch(e){ toast(e.message,true); }
+}
+
 async function doRun(){
   const p=currentProject(); if(!p){ toast("Link a repo first",true); return; }
   logClear(); logLine("$ devlog run"); setBusy(true);
   try{
     await stream(`/api/projects/${p.id}/run`, {
-      window: parseInt($("#runWindow").value)||30, backend:$("#runBackend").value
+      window: parseInt($("#runWindow").value)||30, backend:$("#runBackend").value,
+      branch: $("#runBranch").value || undefined,
+      target: Math.max(0, parseInt($("#runTarget").value)||0)
     }, ev=>{
       if(ev.type==="progress") logLine(ev.message);
       else if(ev.type==="error") logLine("error: "+ev.message,"err");
@@ -310,23 +589,78 @@ async function doResearch(id, backend){
 
 async function loadTemplates(){
   const p=currentProject(); if(!p) return;
-  const tpls = await api(`/api/projects/${p.id}/templates`);
-  renderTemplates(tpls);
+  STATE.templates = await api(`/api/projects/${p.id}/templates`);
+  renderTemplates(STATE.templates);
 }
 function renderTemplates(tpls){
   const el=$("#templateList");
-  if(!tpls.length){ el.innerHTML='<span class="muted">none</span>'; return; }
+  if(!tpls.length){ el.innerHTML='<span class="muted">none yet — add one</span>'; return; }
   el.innerHTML = tpls.map(t=>{
     const first=(t.body.split("\n").find(l=>l.trim())||"").replace(/^#\s*/,"");
     return `<div class="row" style="margin-bottom:4px;"><span class="pill">${t.audience}</span>
-      <span class="muted">${escapeHtml(first)}</span>
-      <button data-aud="${t.audience}" class="tplView">view</button></div>`;
+      <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(first)}</span>
+      <button data-aud="${t.audience}" class="tplView mini">view</button>
+      <button data-aud="${t.audience}" class="tplEdit mini">edit</button>
+      <button data-aud="${t.audience}" class="tplDel mini danger" title="delete">×</button></div>`;
   }).join("");
-  el.querySelectorAll(".tplView").forEach(b=>b.onclick=()=>{
-    const t=tpls.find(x=>x.audience===b.dataset.aud);
-    $("#viewerTitle").textContent=`Template: ${t.audience}`;
-    $("#viewer").innerHTML=`<pre>${escapeHtml(t.body)}</pre>`;
-  });
+  el.querySelectorAll(".tplView").forEach(b=>b.onclick=()=>viewTemplate(b.dataset.aud));
+  el.querySelectorAll(".tplEdit").forEach(b=>b.onclick=()=>editTemplate(b.dataset.aud));
+  el.querySelectorAll(".tplDel").forEach(b=>b.onclick=()=>deleteTemplate(b.dataset.aud));
+}
+function findTemplate(aud){ return (STATE.templates||[]).find(t=>t.audience===aud); }
+
+function viewTemplate(aud){
+  const t=findTemplate(aud); if(!t) return;
+  $("#viewer").className="";
+  $("#viewerTitle").textContent=`Template: ${t.audience}`;
+  $("#viewer").innerHTML=`<div class="md">${mdToHtml(t.body)}</div>
+    <div class="row" style="margin-top:12px;"><button class="primary tplEditNow">✎ Edit</button></div>`;
+  $("#viewer .tplEditNow").onclick=()=>editTemplate(aud);
+}
+
+function editTemplate(aud){
+  const t=aud?findTemplate(aud):null;
+  const isNew=!t;
+  $("#viewer").className="";
+  $("#viewerTitle").textContent=isNew?"New template":`Edit template: ${aud}`;
+  const audField=isNew
+    ? `<div class="detail-field"><div class="k">Audience name</div>
+        <input id="tplAud" placeholder="e.g. release-notes" size="24"></div>`
+    : "";
+  const body=isNew
+    ? `# Audience: \n\nDescribe who this audience is and what they care about.\n\n## Tone\n\n## Good fits\n- \n\n## Avoid\n- \n`
+    : t.body;
+  $("#viewer").innerHTML=`${audField}
+    <div class="detail-field"><div class="k">Markdown</div>
+    <textarea id="tplBody" class="editor" spellcheck="false">${escapeHtml(body)}</textarea></div>
+    <div class="row">
+      <button class="primary" id="tplSave">Save</button>
+      <button id="tplCancel">Cancel</button>
+      ${isNew?"":`<div class="grow"></div><button class="danger" id="tplDelBtn">Delete</button>`}
+    </div>`;
+  $("#tplSave").onclick=()=>saveTemplate(isNew?($("#tplAud").value.trim()):aud, $("#tplBody").value, isNew);
+  $("#tplCancel").onclick=clearViewer;
+  if(!isNew) $("#tplDelBtn").onclick=()=>deleteTemplate(aud);
+}
+
+async function saveTemplate(aud, body, isNew){
+  const p=currentProject(); if(!p) return;
+  if(!aud){ toast("Enter an audience name",true); return; }
+  try{
+    await api(`/api/projects/${p.id}/templates`, {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({audience:aud, body})});
+    toast(`Saved template '${aud}'`);
+    await loadTemplates(); viewTemplate(aud);
+  }catch(e){ toast(e.message,true); }
+}
+
+async function deleteTemplate(aud){
+  const p=currentProject(); if(!p) return;
+  if(!confirm(`Delete template '${aud}'? This can't be undone.`)) return;
+  try{
+    await api(`/api/projects/${p.id}/templates/${encodeURIComponent(aud)}/delete`, {method:"POST"});
+    toast(`Deleted '${aud}'`); clearViewer(); await loadTemplates();
+  }catch(e){ toast(e.message,true); }
 }
 
 async function reseed(){
@@ -339,19 +673,60 @@ async function reseed(){
   }catch(e){ toast(e.message,true); }
 }
 
+function branchQuery(){ const b=$("#runBranch").value; return b?`&branch=${encodeURIComponent(b)}`:""; }
 async function viewDigest(){
   const p=currentProject(); if(!p) return;
   const w=parseInt($("#runWindow").value)||30;
-  const d = await api(`/api/projects/${p.id}/digest?window=${w}`);
-  $("#viewerTitle").textContent=`Digest (last ${d.window}d, ${d.num_commits} commits)`;
+  const d = await api(`/api/projects/${p.id}/digest?window=${w}`+branchQuery());
+  $("#viewer").className="";
+  $("#viewerTitle").textContent=`Digest — ${d.branch} (last ${d.window}d, ${d.num_commits} commits)`;
   $("#viewer").innerHTML=`<pre>${escapeHtml(d.text)}</pre>`;
 }
 async function viewPrompt(){
   const p=currentProject(); if(!p) return;
   const w=parseInt($("#runWindow").value)||30;
-  const d = await api(`/api/projects/${p.id}/prompt?window=${w}`);
-  $("#viewerTitle").textContent="Planner prompt";
+  const d = await api(`/api/projects/${p.id}/prompt?window=${w}`+branchQuery());
+  $("#viewer").className="";
+  $("#viewerTitle").textContent="Assembled planner prompt";
   $("#viewer").innerHTML=`<pre>${escapeHtml(d.prompt)}</pre>`;
+}
+
+async function editPlannerPrompt(){
+  const p=currentProject(); if(!p){ toast("Link a repo first",true); return; }
+  const d = await api(`/api/projects/${p.id}/planner-prompt`);
+  $("#viewer").className="";
+  $("#viewerTitle").textContent=`Planner prompt — ${d.is_custom?"custom":"default"}`;
+  const toks=d.placeholders.map(x=>`<code>{{${x}}}</code>`).join(" ");
+  $("#viewer").innerHTML=`
+    <div class="muted" style="margin-bottom:8px;">Tune the instructions the planner gets.
+      These tokens are filled with live data at run time: ${toks}.
+      <code>{{digest}}</code> is required.</div>
+    <textarea id="ppBody" class="editor" spellcheck="false">${escapeHtml(d.prompt)}</textarea>
+    <div class="row" style="margin-top:8px;">
+      <button class="primary" id="ppSave">Save</button>
+      <button id="ppCancel">Cancel</button>
+      <div class="grow"></div>
+      <button class="danger" id="ppReset"${d.is_custom?"":" disabled"}>Reset to default</button>
+    </div>`;
+  $("#ppSave").onclick=()=>savePlannerPrompt($("#ppBody").value);
+  $("#ppCancel").onclick=clearViewer;
+  $("#ppReset").onclick=resetPlannerPrompt;
+}
+async function savePlannerPrompt(prompt){
+  const p=currentProject(); if(!p) return;
+  try{
+    await api(`/api/projects/${p.id}/planner-prompt`, {method:"POST",
+      headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt})});
+    toast("Planner prompt saved"); editPlannerPrompt();
+  }catch(e){ toast(e.message,true); }
+}
+async function resetPlannerPrompt(){
+  const p=currentProject(); if(!p) return;
+  if(!confirm("Discard the custom planner prompt and restore the default?")) return;
+  try{
+    await api(`/api/projects/${p.id}/planner-prompt/reset`, {method:"POST"});
+    toast("Reset to default"); editPlannerPrompt();
+  }catch(e){ toast(e.message,true); }
 }
 
 async function linkRepo(relinkId){
@@ -369,9 +744,91 @@ async function linkRepo(relinkId){
   }catch(e){ toast(e.message,true); }
 }
 
+// --- auth ---
+function showLogin(){ $("#loginOverlay").classList.remove("hidden");
+  setTimeout(()=>$("#loginKey").focus(), 30); }
+function hideLogin(){ $("#loginOverlay").classList.add("hidden"); }
+async function doLogin(ev){
+  if(ev) ev.preventDefault();
+  const key=$("#loginKey").value.trim();
+  $("#loginErr").textContent="";
+  if(!key){ $("#loginErr").textContent="Enter your access key."; return; }
+  try{
+    const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({key})});
+    if(!r.ok){ let m="Sign in failed"; try{ m=(await r.json()).error||m; }catch(_){}
+      $("#loginErr").textContent=m; return; }
+    $("#loginKey").value=""; hideLogin();
+    $("#logoutBtn").classList.remove("hidden");
+    await loadProjects();
+  }catch(e){ $("#loginErr").textContent=e.message; }
+}
+async function doLogout(){
+  try{ await fetch("/api/logout",{method:"POST"}); }catch(_){}
+  location.reload();
+}
+
 function setBusy(b){ $("#runBtn").disabled=b; }
 function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,
   c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// timestamps are stored ISO-UTC (…Z); show them in the viewer's local time.
+const OLD_DAYS = 60;  // entries older than this get a gentle "may be stale" cue
+function parseTs(iso){ if(!iso) return null; const d=new Date(iso); return isNaN(d)?null:d; }
+function ageDays(iso){ const d=parseTs(iso); return d?(Date.now()-d.getTime())/86400000:0; }
+function fmtDate(iso){ const d=parseTs(iso); if(!d) return "—";
+  return d.toLocaleString(undefined,{year:"numeric",month:"short",day:"numeric",
+    hour:"2-digit",minute:"2-digit"}); }
+function timeAgo(iso){ const d=parseTs(iso); if(!d) return "";
+  const s=(Date.now()-d.getTime())/1000;
+  if(s<0) return "just now";
+  const u=[["y",31536000],["mo",2592000],["d",86400],["h",3600],["m",60]];
+  for(const [label,secs] of u){ const n=Math.floor(s/secs); if(n>=1) return `${n}${label} ago`; }
+  return "just now"; }
+
+function clearViewer(){ $("#viewerTitle").textContent="Detail";
+  $("#viewer").className="muted";
+  $("#viewer").innerHTML="Select an idea to view it, or run / view a digest."; }
+
+// Minimal, safe Markdown -> HTML (escape first, then a handful of block/inline rules).
+function safeUrl(u){ return /^(https?:\/\/|mailto:|#|\/)/i.test(u) ? u : "#"; }
+function mdInline(t){
+  return escapeHtml(t)
+    .replace(/`([^`]+)`/g,(m,c)=>`<code>${c}</code>`)
+    .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g,"$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+      (m,txt,url)=>`<a href="${escapeHtml(safeUrl(url))}" target="_blank" rel="noopener">${txt}</a>`);
+}
+function mdToHtml(src){
+  if(src==null||src==="") return '<span class="muted">—</span>';
+  const lines=String(src).replace(/\r\n?/g,"\n").split("\n");
+  let html="", i=0;
+  const isUl=l=>/^\s*[-*+]\s+/.test(l), isOl=l=>/^\s*\d+\.\s+/.test(l);
+  while(i<lines.length){
+    const line=lines[i];
+    if(/^```/.test(line)){ const buf=[]; i++;
+      while(i<lines.length && !/^```/.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++; html+=`<pre class="md-code"><code>${escapeHtml(buf.join("\n"))}</code></pre>`; continue; }
+    const h=line.match(/^(#{1,6})\s+(.*)$/);
+    if(h){ const n=h[1].length; html+=`<h${n}>${mdInline(h[2])}</h${n}>`; i++; continue; }
+    if(/^\s*>\s?/.test(line)){ const buf=[];
+      while(i<lines.length && /^\s*>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^\s*>\s?/,"")); i++; }
+      html+=`<blockquote>${mdInline(buf.join(" "))}</blockquote>`; continue; }
+    if(isUl(line)){ html+="<ul>";
+      while(i<lines.length && isUl(lines[i])){ html+=`<li>${mdInline(lines[i].replace(/^\s*[-*+]\s+/,""))}</li>`; i++; }
+      html+="</ul>"; continue; }
+    if(isOl(line)){ html+="<ol>";
+      while(i<lines.length && isOl(lines[i])){ html+=`<li>${mdInline(lines[i].replace(/^\s*\d+\.\s+/,""))}</li>`; i++; }
+      html+="</ol>"; continue; }
+    if(line.trim()===""){ i++; continue; }
+    const para=[];
+    while(i<lines.length && lines[i].trim()!=="" && !/^(#{1,6})\s|^```|^\s*>\s?/.test(lines[i])
+          && !isUl(lines[i]) && !isOl(lines[i])){ para.push(lines[i]); i++; }
+    html+=`<p>${mdInline(para.join(" "))}</p>`;
+  }
+  return html;
+}
 
 // wire up
 $("#projectSelect").onchange = e=>{ STATE.projectId=e.target.value; STATE.selected=null; onProjectChange(); };
@@ -382,8 +839,16 @@ $("#relinkBtn").onclick = ()=>linkRepo($("#relinkSelect").value);
 $("#runBtn").onclick = doRun;
 $("#digestBtn").onclick = viewDigest;
 $("#promptBtn").onclick = viewPrompt;
+$("#promptEditBtn").onclick = editPlannerPrompt;
 $("#applyFilter").onclick = loadEntries;
+["#filterStatus","#filterAudience","#filterBranch"].forEach(s=>$(s).onchange = loadEntries);
+$("#newTplBtn").onclick = ()=>editTemplate(null);
 $("#reseedBtn").onclick = reseed;
+$("#branchNoteBtn").onclick = editBranchNote;
+$("#tabIdeas").onclick = ()=>switchView("ideas");
+$("#tabSchedule").onclick = ()=>switchView("schedule");
+$("#loginForm").addEventListener("submit", doLogin);
+$("#logoutBtn").onclick = doLogout;
 
 (async function init(){
   try{
@@ -391,6 +856,8 @@ $("#reseedBtn").onclick = reseed;
     STATE.statuses = h.statuses;
     $("#runWindow").value = h.default_window;
     const fs=$("#filterStatus"); h.statuses.forEach(s=>fs.add(new Option(s,s)));
+    if(h.auth_required && h.authed) $("#logoutBtn").classList.remove("hidden");
+    if(h.auth_required && !h.authed){ showLogin(); return; }
     await loadProjects();
   }catch(e){ toast("Failed to load: "+e.message, true); }
 })();

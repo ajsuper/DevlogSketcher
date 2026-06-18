@@ -33,8 +33,10 @@ dir, keyed by repo:
 ~/.local/share/devlogsketcher/
   registry.json                 # repo path -> project
   projects/<name>-<hash>/
-    store.db                    # sqlite post database
+    store.db                    # sqlite post database (entries: branch + publish-date aware)
     templates/                  # audience templates (markdown)
+    planner.md                  # custom planner prompt (only if edited)
+    branches.json               # per-branch planner instructions (only if set)
 ```
 
 A repo is identified by the git root of your cwd (or `--repo PATH`).
@@ -43,15 +45,31 @@ A repo is identified by the git root of your cwd (or `--repo PATH`).
 
 ```bash
 devlog init                 # link the current repo (--name to override, --relink to re-point after a move)
-devlog run                  # review history -> propose/update post ideas (--window N days, default 30)
-devlog list [--status S] [--audience A]
+devlog run                  # review history -> propose/update post ideas (--window N, --branch B, --target N)
+devlog list [--status S] [--audience A] [--branch B]
 devlog show <id>
+devlog export <id>          # export an entry's outline to md/txt/html (--format, -o)
 devlog research <id>        # deepen one entry's outline
 devlog status <id> <state>  # suggested|researched|in_progress|published|rejected|stale
-devlog templates            # list audience templates (edit the markdown files directly)
+devlog delete <id>          # delete one entry  (reset = delete all; unlink = drop a project)
+devlog schedule <id> <date> # set a target publish date (agenda = see the calendar)
+devlog branches             # per-branch planner instructions (--edit/--delete <branch>)
+devlog templates            # list audience templates (--edit/--delete <audience> to manage them)
+devlog prompt               # view the planner prompt (--edit to tune it, --reset to restore default)
 devlog projects             # all linked repos
-devlog digest               # debug: print what the planner would see
+devlog digest               # debug: print what the planner would see (--branch B)
+devlog web                  # local web app with full CLI parity (markdown, branches, scheduling)
+devlog keys add             # generate an access key to require sign-in when sharing the web app
 ```
+
+Reviewing by branch: `devlog run --branch dev` reviews a feature branch and tags ideas
+with their branch. Give each branch its own framing with `devlog branches --edit dev`
+(e.g. "frame as work-in-progress") so a dev-branch idea reads as WIP and a production
+one as shipped. Ideas dedupe across branches, so one that starts on `dev` updates in
+place when it lands on `main`.
+
+Sharing the web app beyond localhost? `devlog keys add` turns on access-key sign-in
+(see `docs/usage.md`); put it behind an HTTPS tunnel since the server speaks plain HTTP.
 
 Run `devlog init` once per repo. Moving a repo? `devlog init --relink <project>` from
 the new location. Plain `init` refuses to touch an already-linked repo, so you can't

@@ -13,6 +13,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .paths import DevlogError
+
 DEFAULT_WINDOW_DAYS = 30
 
 
@@ -35,24 +37,58 @@ class Digest:
     window_days: int
     since: str
     commits: list[Commit]
+    branch: str = ""  # the branch/ref this digest was built from
 
     @property
     def num_commits(self) -> int:
         return len(self.commits)
 
 
+def current_branch(repo_path: str | Path) -> str:
+    """Name of the checked-out branch, or 'HEAD' when detached."""
+    out = subprocess.run(
+        ["git", "-C", str(repo_path), "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    return out or "HEAD"
+
+
+def list_branches(repo_path: str | Path) -> list[str]:
+    """Local branch names, with the current branch first."""
+    out = subprocess.run(
+        ["git", "-C", str(repo_path), "for-each-ref", "--format=%(refname:short)",
+         "refs/heads"],
+        capture_output=True, text=True,
+    ).stdout
+    branches = [b for b in out.splitlines() if b.strip()]
+    cur = current_branch(repo_path)
+    if cur in branches:
+        branches.remove(cur)
+        branches.insert(0, cur)
+    return branches
+
+
 _SEP = "\x1e"  # record separator unlikely to appear in commit text
 _FMT = _SEP.join(["%H", "%h", "%cI", "%an", "%s", "%b"]) + "\x1d"
 
 
-def build_digest(repo_path: str | Path, window_days: int = DEFAULT_WINDOW_DAYS) -> Digest:
+def build_digest(repo_path: str | Path, window_days: int = DEFAULT_WINDOW_DAYS,
+                 ref: str | None = None) -> Digest:
     repo = str(Path(repo_path).resolve())
     since = f"{window_days} days ago"
-    raw = subprocess.run(
-        ["git", "-C", repo, "log", f"--since={since}",
-         f"--pretty=format:{_FMT}", "--no-merges"],
-        capture_output=True, text=True, check=True,
-    ).stdout
+    branch = ref or current_branch(repo)
+    if ref:
+        verify = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "--verify", "--quiet", ref],
+            capture_output=True, text=True,
+        )
+        if verify.returncode != 0:
+            raise DevlogError(f"no such branch/ref '{ref}' in {repo}")
+    log_cmd = ["git", "-C", repo, "log"]
+    if ref:
+        log_cmd.append(ref)
+    log_cmd += [f"--since={since}", f"--pretty=format:{_FMT}", "--no-merges"]
+    raw = subprocess.run(log_cmd, capture_output=True, text=True, check=True).stdout
 
     commits: list[Commit] = []
     for record in raw.split("\x1d"):
@@ -69,7 +105,8 @@ def build_digest(repo_path: str | Path, window_days: int = DEFAULT_WINDOW_DAYS) 
             subject=subject, body=body.strip(),
             files=files, insertions=ins, deletions=dele,
         ))
-    return Digest(repo_path=repo, window_days=window_days, since=since, commits=commits)
+    return Digest(repo_path=repo, window_days=window_days, since=since,
+                  commits=commits, branch=branch)
 
 
 def _commit_stats(repo: str, sha: str) -> tuple[list[str], int, int]:
@@ -93,6 +130,7 @@ def render_digest(digest: Digest) -> str:
     """Plain-text rendering handed to the planner (and useful for `digest` debug)."""
     lines = [
         f"Repo: {digest.repo_path}",
+        f"Branch: {digest.branch or '(current)'}",
         f"Window: last {digest.window_days} days  ({digest.num_commits} commits)",
         "",
     ]
